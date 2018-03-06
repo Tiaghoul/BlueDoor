@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">TeseFirstTry</string>
     <string name="unknown_device">Unknown device detected</string>
-    <string name="devicescanactivity">Device Scaning</string>
     <string name="rescandevice">Scan again</string>
     <string name="unknown_service">Unknown Service</string>
     <string name="unknown_characteristic">Unknown Chartacteristic</string>
+    <string name="write_to_charat">Write characteristic</string>
 </resources>

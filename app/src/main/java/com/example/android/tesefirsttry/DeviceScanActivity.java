@@ -67,7 +67,6 @@ public class DeviceScanActivity extends AppCompatActivity {
     // Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 5000;
     private static final int REQUEST_ENABLE_BT = 1;
-    private boolean canScan = false;
 
     public final static UUID UUID_HEART_RATE_CONTROL_POINT =
             UUID.fromString(GattAttributes.HEART_RATE_CONTROL_POINT);
@@ -118,7 +117,8 @@ public class DeviceScanActivity extends AppCompatActivity {
                     getApplicationContext().bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
                 }
                 else if(connectedBleDeviceAddress == bledevice.getAddress().toString()){
-                    Log.d(TAG, "ALREADY CONNECTED TO " + bledevice.getName() + " | " + bledevice.getBluetoothClass().getDeviceClass());
+                    Log.d(TAG, "DISCONNECTING FROM " + bledevice.getName() + " | " + bledevice.getBluetoothClass().getDeviceClass());
+                    dealWithDisconnect();
                 }
             }
         });
@@ -136,7 +136,7 @@ public class DeviceScanActivity extends AppCompatActivity {
 
         );
 
-        canScan = checkIfCanScan();
+        boolean canScan = checkIfCanScan();
         if(canScan){
             scanLeDevice(true);
         }
@@ -200,7 +200,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         // User chose not to enable Bluetooth.
         if (requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_CANCELED) {
 //            finish();
-            return;
         }
         else if(requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_OK){
             mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
@@ -284,10 +283,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
             Log.i(TAG, "onServiceDisconnected calling disConnect()");
-            mBluetoothLeService.disconnect();
-//            getApplicationContext().unbindService(mServiceConnection);
-            stopService(gattServiceIntent);
-            connectedBleDeviceAddress = null;
+            dealWithDisconnect();
         }
     };
 
@@ -351,6 +347,13 @@ public class DeviceScanActivity extends AppCompatActivity {
                 }
             }
         }
+    }
+
+
+    private final void dealWithDisconnect(){
+        mBluetoothLeService.disconnect();
+        stopService(gattServiceIntent);
+        connectedBleDeviceAddress = null;
     }
 
     private static IntentFilter makeGattUpdateIntentFilter() {

@@ -22,7 +22,7 @@
     <Button
         android:layout_gravity="center"
         android:id="@+id/button_write"
-        android:text="WRITE TO CARACT"
+        android:text="@string/write_to_charat"
         android:layout_margin="1dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
