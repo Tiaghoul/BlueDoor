@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <ListView xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/list"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.9"
+        android:divider="@null"
+        android:dividerHeight="0dp"/>
+
+    <!--<TextView android:id="@+id/emptyView"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:layout_centerInParent="true"-->
+        <!--/>-->
+
+    <Button
+        android:layout_gravity="center"
+        android:id="@+id/button_write"
+        android:text="WRITE TO CARACT"
+        android:layout_margin="1dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.1"/>
+    <!--<ProgressBar-->
+        <!--android:id="@+id/progressBar"-->
+        <!--style="@style/Widget.AppCompat.ProgressBar"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="0dp"-->
+        <!--android:layout_weight="0.5"-->
+        <!--android:layout_centerInParent="true" />-->
+
+</LinearLayout>
+
