@@ -19,12 +19,14 @@ import android.util.Log;
 import android.widget.Toast;
 
 import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
+import java.util.List;
 
 import static android.content.ContentValues.TAG;
 
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Service for managing connection and data communication with a GATT server hosted on a
@@ -43,6 +45,7 @@ public class BleService extends Service {
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
+    private boolean canWrite = true;
 
     public final static String ACTION_GATT_CONNECTED =
             "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
@@ -61,8 +64,8 @@ public class BleService extends Service {
     public final static UUID UUID_HEART_RATE_MEASUREMENT =
             UUID.fromString(GattAttributes.HEART_RATE_MEASUREMENT);
 
-    public final static UUID UUID_HEART_RATE_CONTROL_POINT =
-            UUID.fromString(GattAttributes.HEART_RATE_CONTROL_POINT);
+    public final static UUID UUID_BLE_NOTIFY_CHARACT =
+            UUID.fromString(GattAttributes.BLE_NOTIFY_CHARACT);
 
     // Implements callback methods for GATT events that the app cares about.  For example,
     // connection change and services discovered.
@@ -110,6 +113,12 @@ public class BleService extends Service {
             Log.d(TAG, "onCharacteristicChanged com " + characteristic.getUuid());
             broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
         }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            canWrite = true;
+            Log.d(TAG, "-----------onCharacteristicWrite com " + characteristic.getUuid() + "\n FICOU TRUE AGAIN");
+        }
     };
 
     private void broadcastUpdate(final String action) {
@@ -119,33 +128,29 @@ public class BleService extends Service {
 
     private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
+        Log.d(TAG, "ENTRA broadcastUpdate");
 
-        // This is special handling for the Heart Rate Measurement profile.  Data parsing is
-        // carried out as per profile specifications:
-        // http://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.heart_rate_measurement.xml
-        if (UUID_HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) {
-            int flag = characteristic.getProperties();
-            int format = -1;
-            if ((flag & 0x01) != 0) {
-                format = BluetoothGattCharacteristic.FORMAT_UINT16;
-                Log.d(TAG, "Heart rate format UINT16.");
-            } else {
-                format = BluetoothGattCharacteristic.FORMAT_UINT8;
-                Log.d(TAG, "Heart rate format UINT8.");
-            }
-            final int heartRate = characteristic.getIntValue(format, 1);
-            Log.d(TAG, String.format("Received heart rate: %d", heartRate));
-            intent.putExtra(EXTRA_DATA, String.valueOf(heartRate));
-        } else {
+        if (UUID_BLE_NOTIFY_CHARACT.equals(characteristic.getUuid())) {
+            Log.d(TAG, "ENTRA NO IF UUID");
             // For all other profiles, writes the data formatted in HEX.
-            final byte[] data = characteristic.getValue();
-            Log.d(TAG, "Data received -> " + new String(data));
-            if (data != null && data.length > 0) {
-                final StringBuilder stringBuilder = new StringBuilder(data.length);
-                for(byte byteChar : data)
-                    stringBuilder.append(String.format("%02X ", byteChar));
-                intent.putExtra(EXTRA_DATA, new String(data) + "\n" + stringBuilder.toString());
-            }
+            final int final_value = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
+            Log.d(TAG, "Data received -> " + final_value);
+            intent.putExtra(EXTRA_DATA, String.valueOf(final_value));
+        } else {
+            Log.d(TAG, "ENTRA NO ELSE");
+            // For all other profiles, writes the data formatted in HEX.
+            final int final_value = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
+            Log.d(TAG, "Data received -> " + final_value);
+            intent.putExtra(EXTRA_DATA, String.valueOf(final_value));
+
+//            final byte[] data = characteristic.getValue();
+//            Log.d(TAG, "Data received -> " + new String(data));
+//            if (data != null && data.length > 0) {
+//                final StringBuilder stringBuilder = new StringBuilder(data.length);
+//                for(byte byteChar : data)
+//                    stringBuilder.append(String.format("%02X ", byteChar));
+//                intent.putExtra(EXTRA_DATA, new String(data) + "\n" + stringBuilder.toString());
+//            }
         }
         sendBroadcast(intent);
     }
@@ -235,10 +240,7 @@ public class BleService extends Service {
         mBluetoothGatt.disconnect();
     }
 
-    /**
-     * After using a given BLE device, the app must call this method to ensure resources are
-     * released properly.
-     */
+
     public void close() {
         if (mBluetoothGatt == null) {
             return;
@@ -247,13 +249,7 @@ public class BleService extends Service {
         mBluetoothGatt = null;
     }
 
-    /**
-     * Request a read on a given {@code BluetoothGattCharacteristic}. The read result is reported
-     * asynchronously through the {@code BluetoothGattCallback#onCharacteristicRead(android.bluetooth.BluetoothGatt, android.bluetooth.BluetoothGattCharacteristic, int)}
-     * callback.
-     *
-     * @param characteristic The characteristic to read from.
-     */
+
     public void readCharacteristic(BluetoothGattCharacteristic characteristic) {
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
@@ -263,6 +259,7 @@ public class BleService extends Service {
     }
 
     public void writeCharacteristic(BluetoothGattCharacteristic characteristic, String value){
+        int size_mtu = 18;
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
@@ -274,8 +271,47 @@ public class BleService extends Service {
         } catch (UnsupportedEncodingException e) {
             Log.e(TAG, "Failed to convert message string to byte array");
         }
-        characteristic.setValue(messageBytes);
-        mBluetoothGatt.writeCharacteristic(characteristic);
+        int number_of_messages = 0;
+        if(messageBytes.length > size_mtu){
+            int max_position = size_mtu;
+            number_of_messages = (messageBytes.length / size_mtu) + 1;
+            byte[] subbytes;
+            for(int i = 0; i < number_of_messages; i++){
+                if(max_position < messageBytes.length){
+                    subbytes = Arrays.copyOfRange(messageBytes, i * max_position, (i+1) * max_position);
+                    max_position += size_mtu;
+                }
+                else{
+                    subbytes = Arrays.copyOfRange(messageBytes, i * size_mtu, messageBytes.length );
+                }
+                if(canWrite) {
+                    Log.d(TAG, "ENTROU CAN WRITE");
+                    canWrite = false;
+                    characteristic.setValue(messageBytes);
+                    mBluetoothGatt.writeCharacteristic(characteristic);
+                }
+                else{
+                    while(!canWrite){
+                        new Timer().schedule(new TimerTask() {
+                            @Override
+                            public void run() {
+                                Log.d(TAG, "waiting...");
+                            }
+                        }, 1000);
+                    }
+                    Log.d(TAG, "SAIU WHILE LOOP");
+                    canWrite = false;
+                    characteristic.setValue(messageBytes);
+                    mBluetoothGatt.writeCharacteristic(characteristic);
+                }
+                try {
+                    Log.d(TAG, "PARTE DA MENSAGEM: " + new String(subbytes, "UTF-8"));
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        Log.d(TAG, "MESSASE SIZE || BYTES SIZE: " + value.length() + " || " + messageBytes.length + " -> " + value);
     }
 
 
@@ -288,19 +324,15 @@ public class BleService extends Service {
         }
 
         mBluetoothGatt.setCharacteristicNotification(characteristic, enabled);
-
-
         final BluetoothGattDescriptor descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID);
 
-        boolean connected = false;
         if(descriptor != null){
             descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-            connected = mBluetoothGatt.writeDescriptor(descriptor);
+            boolean connected = mBluetoothGatt.writeDescriptor(descriptor);
             while(!connected){
                 connected = mBluetoothGatt.writeDescriptor(descriptor);
             }
         }
-//        Log.d(TAG, "connected -: " + connected);
     }
 
 

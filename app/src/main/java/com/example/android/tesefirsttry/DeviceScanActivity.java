@@ -71,6 +71,8 @@ public class DeviceScanActivity extends AppCompatActivity {
     public final static UUID UUID_HEART_RATE_CONTROL_POINT =
             UUID.fromString(GattAttributes.HEART_RATE_CONTROL_POINT);
 
+    public final static UUID UUID_BLE_AC_SERVICE = UUID.fromString(GattAttributes.BLE_AC_SERVICE);
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -128,8 +130,7 @@ public class DeviceScanActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 if(mCharactToWrite != null){
-                    mBluetoothLeService.writeCharacteristic(mCharactToWrite, "deeznuts");
-                    value_to_send++;
+                    mBluetoothLeService.writeCharacteristic(mCharactToWrite, "deeeznutsDEEEZNUTS123456789");
                 }
             }
         }
@@ -299,12 +300,12 @@ public class DeviceScanActivity extends AppCompatActivity {
                 Toast.makeText(getApplicationContext(), "DISCONNECTED", Toast.LENGTH_SHORT).show();
             }
             else if(BleService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)){
-//                Log.i(TAG, "SERVICES DISCOVERD: " + mBluetoothLeService.getSupportedGattServices().toString());
                 displayGattServices(mBluetoothLeService.getSupportedGattServices());
             }
             else if(BleService.ACTION_DATA_AVAILABLE.equals(action)){
                 String value = intent.getStringExtra(mBluetoothLeService.EXTRA_DATA);
-                Log.d(TAG, "Charact value: " + value.toString());
+                Log.d(TAG, "Charact value: " + value);
+                Log.d(TAG, "-------------------------------");
             }
         }
     };
@@ -315,34 +316,34 @@ public class DeviceScanActivity extends AppCompatActivity {
         String unknownCharaString = getResources().getString(R.string.unknown_characteristic);
 
         for(BluetoothGattService gattService : supportedGattServices){
-            Log.d(TAG, "NEW SERVICE: ");
-            String uuid = gattService.getUuid().toString();
-            String service_name = GattAttributes.lookup(uuid, unknownServiceString);
-            Log.d(TAG, "SERVICE NAME -> " + service_name + " || UUID -> " + uuid);
+            if(UUID_BLE_AC_SERVICE.equals(gattService.getUuid())){
+                String uuid = gattService.getUuid().toString();
+                String service_name = GattAttributes.lookup(uuid, unknownServiceString);
+                Log.d(TAG, "SERVICE NAME -> " + service_name + " || UUID -> " + uuid);
 
-            List<BluetoothGattCharacteristic> gattCharacteristics =
-                    gattService.getCharacteristics();
+                List<BluetoothGattCharacteristic> gattCharacteristics =
+                        gattService.getCharacteristics();
 
-            for(BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics){
-//                Log.d(TAG, "\tCharact from " + service_name + ": " + gattCharacteristic.toString());
-                uuid = gattCharacteristic.getUuid().toString();
-                String charac_name = GattAttributes.lookup(uuid,unknownCharaString);
+                for(BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics){
+                    uuid = gattCharacteristic.getUuid().toString();
+                    String charac_name = GattAttributes.lookup(uuid,unknownCharaString);
 
-                final int charaProp = gattCharacteristic.getProperties();
-//                Log.d(TAG, "\t\tCharact Props: " + charaProp);
-                if((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0){
-                    Log.d(TAG, "\tCharact from " + service_name + ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
-                    mBluetoothLeService.readCharacteristic(gattCharacteristic);
-                }
-                if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0){
-                    Log.d(TAG, "\tCharact from " + service_name + ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
-                    mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
-                }
-                if((charaProp & BluetoothGattCharacteristic.PROPERTY_WRITE) > 0){
-                    if(UUID_HEART_RATE_CONTROL_POINT.equals(gattCharacteristic.getUuid())){
+                    final int charaProp = gattCharacteristic.getProperties();
+
+                    if((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0){
+                        Log.d(TAG, "\tCharact from " + service_name + ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
+//                        mBluetoothLeService.readCharacteristic(gattCharacteristic);
+                    }
+                    if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0){
+                        Log.d(TAG, "\tCharact from " + service_name + ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
+                        mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
+                    }
+                    if((charaProp & BluetoothGattCharacteristic.PROPERTY_WRITE) > 0){
                         Log.d(TAG, "\tCharact from " + service_name + ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY WRITE");
-                        mCharactToWrite = gattCharacteristic;
-                        mCharactToWrite.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+//                    if(UUID_HEART_RATE_CONTROL_POINT.equals(gattCharacteristic.getUuid())){
+//                        mCharactToWrite = gattCharacteristic;
+//                        mCharactToWrite.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+//                    }
                     }
                 }
             }
