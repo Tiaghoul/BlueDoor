@@ -43,8 +43,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static android.R.attr.data;
-
 
 public class DeviceScanActivity extends AppCompatActivity {
     private final static String TAG = DeviceScanActivity.class.getSimpleName();
@@ -68,10 +66,9 @@ public class DeviceScanActivity extends AppCompatActivity {
     private static final long SCAN_PERIOD = 5000;
     private static final int REQUEST_ENABLE_BT = 1;
 
-    public final static UUID UUID_HEART_RATE_CONTROL_POINT =
-            UUID.fromString(GattAttributes.HEART_RATE_CONTROL_POINT);
-
     public final static UUID UUID_BLE_AC_SERVICE = UUID.fromString(GattAttributes.BLE_AC_SERVICE);
+
+    public final static UUID UUID_BLE_OPEN_DOOR_CHARACT = UUID.fromString(GattAttributes.BLE_OPEN_DOOR_CHARACT);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -87,9 +84,6 @@ public class DeviceScanActivity extends AppCompatActivity {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
             }
         }
-//        else{
-//            Toast.makeText(this, "Location permissions already granted", Toast.LENGTH_SHORT).show();
-//        }
 
 //      Initializing Bluetooth services (manager, adapter, scanner)
         mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
@@ -125,12 +119,13 @@ public class DeviceScanActivity extends AppCompatActivity {
             }
         });
 
-        Button write_button = (Button) findViewById(R.id.button_write);
+        Button write_button = findViewById(R.id.button_write);
         write_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if(mCharactToWrite != null){
-                    mBluetoothLeService.writeCharacteristic(mCharactToWrite, "deeeznutsDEEEZNUTS123456789");
+                    mBluetoothLeService.writeCharacteristic(mCharactToWrite, "randomtext");
+//                    mBluetoothLeService.writeCharacteristic(mCharactToWrite, 35);
                 }
             }
         }
@@ -232,13 +227,9 @@ public class DeviceScanActivity extends AppCompatActivity {
                     if(!bleDevicesList.contains(device.getDevice())) {
                         String device_name = device.getDevice().getName();
                         if(device_name != null){
-//                            && device_name.contains("pistas")
                             Log.d(TAG, device_name);
                             mLeDeviceListAdapter.add(device.getDevice());
                             mLeDeviceListAdapter.notifyDataSetChanged();
-                        }
-                        else if (device_name == null){
-//                            Log.d(TAG, "NULL NAME");
                         }
                     }
                 }
@@ -256,7 +247,6 @@ public class DeviceScanActivity extends AppCompatActivity {
                     Toast.makeText(getApplicationContext(), "Scan ended", Toast.LENGTH_SHORT).show();
                 }
             }, SCAN_PERIOD);
-
             mBluetoothLeScanner.startScan(leScanCallback);
         } else {
             mBluetoothLeScanner.stopScan(leScanCallback);
@@ -300,7 +290,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                 Toast.makeText(getApplicationContext(), "DISCONNECTED", Toast.LENGTH_SHORT).show();
             }
             else if(BleService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)){
-                displayGattServices(mBluetoothLeService.getSupportedGattServices());
+                dealWithServices(mBluetoothLeService.getSupportedGattServices());
             }
             else if(BleService.ACTION_DATA_AVAILABLE.equals(action)){
                 String value = intent.getStringExtra(mBluetoothLeService.EXTRA_DATA);
@@ -310,7 +300,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     };
 
-    private void displayGattServices(List<BluetoothGattService> supportedGattServices) {
+    private void dealWithServices(List<BluetoothGattService> supportedGattServices) {
         if(supportedGattServices == null) { return;}
         String unknownServiceString = getResources().getString(R.string.unknown_service);
         String unknownCharaString = getResources().getString(R.string.unknown_characteristic);
@@ -331,19 +321,19 @@ public class DeviceScanActivity extends AppCompatActivity {
                     final int charaProp = gattCharacteristic.getProperties();
 
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0){
-                        Log.d(TAG, "\tCharact from " + service_name + ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
+                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
 //                        mBluetoothLeService.readCharacteristic(gattCharacteristic);
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0){
-                        Log.d(TAG, "\tCharact from " + service_name + ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
+                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
                         mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_WRITE) > 0){
-                        Log.d(TAG, "\tCharact from " + service_name + ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY WRITE");
-//                    if(UUID_HEART_RATE_CONTROL_POINT.equals(gattCharacteristic.getUuid())){
-//                        mCharactToWrite = gattCharacteristic;
-//                        mCharactToWrite.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-//                    }
+                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY WRITE");
+                        if(UUID_BLE_OPEN_DOOR_CHARACT.equals(gattCharacteristic.getUuid())){
+                            mCharactToWrite = gattCharacteristic;
+                            mCharactToWrite.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                        }
                     }
                 }
             }
