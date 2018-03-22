@@ -1,7 +1,7 @@
 package com.example.android.tesefirsttry;
 
-/**
- * Created by Tiago Martins on 06/02/2018.
+/*
+  Created by Tiago Martins on 06/02/2018.
  */
 import android.Manifest;
 
@@ -35,7 +35,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 
@@ -47,13 +46,12 @@ import java.util.UUID;
 public class DeviceScanActivity extends AppCompatActivity {
     private final static String TAG = DeviceScanActivity.class.getSimpleName();
 
-    private  ArrayList<BluetoothDevice> bleDevicesList = new ArrayList<>();
+    private final ArrayList<BluetoothDevice> bleDevicesList = new ArrayList<>();
     private Intent gattServiceIntent;
 
     private LocationManager mLocationManager;
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothLeScanner mBluetoothLeScanner;
-    private BluetoothManager mBluetoothManager;
     private Handler mHandler;
     private LeDeviceListAdapter mLeDeviceListAdapter;
     private BluetoothDevice bledevice;
@@ -61,14 +59,13 @@ public class DeviceScanActivity extends AppCompatActivity {
     private BleService mBluetoothLeService;
 
     private BluetoothGattCharacteristic mCharactToWrite;
-    private int value_to_send = 1;
     // Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 5000;
     private static final int REQUEST_ENABLE_BT = 1;
 
-    public final static UUID UUID_BLE_AC_SERVICE = UUID.fromString(GattAttributes.BLE_AC_SERVICE);
+    private final static UUID UUID_BLE_AC_SERVICE = UUID.fromString(GattAttributes.BLE_AC_SERVICE);
 
-    public final static UUID UUID_BLE_OPEN_DOOR_CHARACT = UUID.fromString(GattAttributes.BLE_OPEN_DOOR_CHARACT);
+    private final static UUID UUID_BLE_OPEN_DOOR_CHARACT = UUID.fromString(GattAttributes.BLE_OPEN_DOOR_CHARACT);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -86,7 +83,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
 
 //      Initializing Bluetooth services (manager, adapter, scanner)
-        mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        BluetoothManager mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = mBluetoothManager.getAdapter();
 
 //      Check if Bluetooth is enabled. If not, requests the user to enable it.
@@ -99,7 +96,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
 
 //      Getting the listview and setting its adapter
-        final ListView bleListView = (ListView) findViewById(R.id.list);
+        final ListView bleListView = findViewById(R.id.list);
         mLeDeviceListAdapter = new LeDeviceListAdapter(this, bleDevicesList);
         bleListView.setAdapter(mLeDeviceListAdapter);
 
@@ -112,25 +109,12 @@ public class DeviceScanActivity extends AppCompatActivity {
                     Log.d(TAG, "CLICKED ON " + bledevice.getName() + " | " + bledevice.getBluetoothClass().getDeviceClass());
                     getApplicationContext().bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
                 }
-                else if(connectedBleDeviceAddress == bledevice.getAddress().toString()){
-                    Log.d(TAG, "DISCONNECTING FROM " + bledevice.getName() + " | " + bledevice.getBluetoothClass().getDeviceClass());
-                    dealWithDisconnect();
-                }
+//                else if(connectedBleDeviceAddress == bledevice.getAddress().toString()){
+//                    Log.d(TAG, "DISCONNECTING FROM " + bledevice.getName() + " | " + bledevice.getBluetoothClass().getDeviceClass());
+//                    dealWithDisconnect();
+//                }
             }
         });
-
-        Button write_button = findViewById(R.id.button_write);
-        write_button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if(mCharactToWrite != null){
-                    mBluetoothLeService.writeCharacteristic(mCharactToWrite, "randomtext");
-//                    mBluetoothLeService.writeCharacteristic(mCharactToWrite, 35);
-                }
-            }
-        }
-
-        );
 
         boolean canScan = checkIfCanScan();
         if(canScan){
@@ -145,7 +129,6 @@ public class DeviceScanActivity extends AppCompatActivity {
             return false;
         }
         if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-            Toast.makeText(this, "Bluetooth needs to be turned on", Toast.LENGTH_LONG).show();
             return false;
         }
         if(mBluetoothLeScanner == null){
@@ -195,11 +178,12 @@ public class DeviceScanActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         // User chose not to enable Bluetooth.
         if (requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_CANCELED) {
+            Toast.makeText(this, "Bluetooth needs to be turned on", Toast.LENGTH_LONG).show();
 //            finish();
         }
         else if(requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_OK){
             mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
-            android.os.SystemClock.sleep(1000);
+            android.os.SystemClock.sleep(200);
             scanLeDevice(true);
         }
     }
@@ -207,18 +191,14 @@ public class DeviceScanActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if(requestCode == 1){
-            if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
-//                Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show();
-            }
-            else{
-                Toast.makeText(this, "Location permission needed for app to work!!!", Toast.LENGTH_LONG).show();
-//                finish();
+            if(grantResults[0] != PackageManager.PERMISSION_GRANTED){
+                Toast.makeText(this, "Location permission needed for app to work.", Toast.LENGTH_LONG).show();
             }
         }
     }
 
     // Device scan callback.
-    private ScanCallback leScanCallback = new ScanCallback() {
+    private final ScanCallback leScanCallback = new ScanCallback() {
         @Override
         public void onScanResult(int callbackType, final ScanResult device) {
             runOnUiThread(new Runnable() {
@@ -254,7 +234,6 @@ public class DeviceScanActivity extends AppCompatActivity {
     }
 
     private final ServiceConnection mServiceConnection = new ServiceConnection() {
-
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder service) {
             mBluetoothLeService = ((BleService.LocalBinder) service).getService();
@@ -262,12 +241,10 @@ public class DeviceScanActivity extends AppCompatActivity {
                 Log.e(TAG, "Unable to initialize Bluetooth");
                 finish();
             }
-            // Automatically connects to the device upon successful start-up initialization.
-            Log.i(TAG, "onServiceConnected calling connect()");
             Log.i(TAG, "ble address: " + bledevice.getAddress());
             Boolean connected = mBluetoothLeService.connect(bledevice.getAddress());
             if(connected){
-                connectedBleDeviceAddress = bledevice.getAddress().toString();
+                connectedBleDeviceAddress = bledevice.getAddress();
             }
         }
 
@@ -277,6 +254,7 @@ public class DeviceScanActivity extends AppCompatActivity {
             dealWithDisconnect();
         }
     };
+
 
     private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
         @Override
@@ -291,6 +269,10 @@ public class DeviceScanActivity extends AppCompatActivity {
             }
             else if(BleService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)){
                 dealWithServices(mBluetoothLeService.getSupportedGattServices());
+                openDoor();
+            }
+            else if(BleService.ACTION_DISCONNECT.equals(action)){
+                dealWithDisconnect();
             }
             else if(BleService.ACTION_DATA_AVAILABLE.equals(action)){
                 String value = intent.getStringExtra(mBluetoothLeService.EXTRA_DATA);
@@ -326,7 +308,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0){
                         Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
-                        mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
+//                        mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_WRITE) > 0){
                         Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY WRITE");
@@ -340,11 +322,19 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     }
 
+    private void openDoor(){
+        if(mCharactToWrite != null){
+            String string_to_send = "open";
+            Log.d(TAG, "STRING : " + string_to_send);
+            mBluetoothLeService.writeCharacteristic(mCharactToWrite, string_to_send);
+        }
+    }
 
-    private final void dealWithDisconnect(){
+    private void dealWithDisconnect(){
         mBluetoothLeService.disconnect();
         stopService(gattServiceIntent);
         connectedBleDeviceAddress = null;
+		mCharactToWrite = null;
     }
 
     private static IntentFilter makeGattUpdateIntentFilter() {
@@ -353,6 +343,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         intentFilter.addAction(BleService.ACTION_GATT_DISCONNECTED);
         intentFilter.addAction(BleService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BleService.ACTION_DATA_AVAILABLE);
+        intentFilter.addAction(BleService.ACTION_DISCONNECT);
         return intentFilter;
     }
 }

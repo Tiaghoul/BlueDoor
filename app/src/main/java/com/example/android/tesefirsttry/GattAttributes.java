@@ -6,14 +6,14 @@ import java.util.HashMap;
  * This class includes a small subset of standard GATT attributes for demonstration purposes.
  */
 public class GattAttributes {
-    private static HashMap<String, String> attributes = new HashMap();
+    private static final HashMap<String, String> attributes = new HashMap<>();
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
 
 //	    MY SERVICE/CHARACTERISTICS:
-	public static String BLE_AC_SERVICE = "713d0000-503e-4c75-ba94-3148f18d941e";
-	public static String BLE_OPEN_DOOR_CHARACT = "713d0002-503e-4c75-ba94-3148f18d941e";
-	public static String BLE_READ_CHARACT = "713d0003-503e-4c75-ba94-3148f18d941e";
-	public static String BLE_NOTIFY_CHARACT = "713d0004-503e-4c75-ba94-3148f18d941e";
+	public static final String BLE_AC_SERVICE = "713d0000-503e-4c75-ba94-3148f18d941e";
+	public static final String BLE_OPEN_DOOR_CHARACT = "713d0002-503e-4c75-ba94-3148f18d941e";
+	public static final String BLE_READ_CHARACT = "713d0003-503e-4c75-ba94-3148f18d941e";
+	public static final String BLE_NOTIFY_CHARACT = "713d0004-503e-4c75-ba94-3148f18d941e";
 
     static {
         // Sample Services.
