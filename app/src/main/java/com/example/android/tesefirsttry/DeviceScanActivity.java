@@ -36,6 +36,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -48,6 +49,7 @@ public class DeviceScanActivity extends AppCompatActivity {
 
     private final ArrayList<BluetoothDevice> bleDevicesList = new ArrayList<>();
     private Intent gattServiceIntent;
+    private TextView emptyTextView;
 
     private LocationManager mLocationManager;
     private BluetoothAdapter mBluetoothAdapter;
@@ -99,6 +101,8 @@ public class DeviceScanActivity extends AppCompatActivity {
         final ListView bleListView = findViewById(R.id.list);
         mLeDeviceListAdapter = new LeDeviceListAdapter(this, bleDevicesList);
         bleListView.setAdapter(mLeDeviceListAdapter);
+        emptyTextView = findViewById(R.id.emptyView);
+        bleListView.setEmptyView(emptyTextView);
 
         bleListView.setOnItemClickListener(new AdapterView.OnItemClickListener(){
             @Override
@@ -109,10 +113,6 @@ public class DeviceScanActivity extends AppCompatActivity {
                     Log.d(TAG, "CLICKED ON " + bledevice.getName() + " | " + bledevice.getBluetoothClass().getDeviceClass());
                     getApplicationContext().bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
                 }
-//                else if(connectedBleDeviceAddress == bledevice.getAddress().toString()){
-//                    Log.d(TAG, "DISCONNECTING FROM " + bledevice.getName() + " | " + bledevice.getBluetoothClass().getDeviceClass());
-//                    dealWithDisconnect();
-//                }
             }
         });
 
@@ -132,6 +132,8 @@ public class DeviceScanActivity extends AppCompatActivity {
             return false;
         }
         if(mBluetoothLeScanner == null){
+            emptyTextView.setText(null);
+            emptyTextView.setVisibility(View.GONE);
             mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
         }
         return true;
@@ -178,7 +180,7 @@ public class DeviceScanActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         // User chose not to enable Bluetooth.
         if (requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_CANCELED) {
-            Toast.makeText(this, "Bluetooth needs to be turned on", Toast.LENGTH_LONG).show();
+            emptyTextView.setText("Bluetooth needs to be enabled");
 //            finish();
         }
         else if(requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_OK){
@@ -192,7 +194,8 @@ public class DeviceScanActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if(requestCode == 1){
             if(grantResults[0] != PackageManager.PERMISSION_GRANTED){
-                Toast.makeText(this, "Location permission needed for app to work.", Toast.LENGTH_LONG).show();
+//                Toast.makeText(this, "Location permission needed for app to work.", Toast.LENGTH_LONG).show();
+                emptyTextView.setText("Location permission needed for app to work");
             }
         }
     }
@@ -225,6 +228,10 @@ public class DeviceScanActivity extends AppCompatActivity {
                 public void run() {
                     mBluetoothLeScanner.stopScan(leScanCallback);
                     Toast.makeText(getApplicationContext(), "Scan ended", Toast.LENGTH_SHORT).show();
+                    if (bleDevicesList.isEmpty()) {
+                        emptyTextView.setVisibility(View.VISIBLE);
+                        emptyTextView.setText("No devices were found");
+                    }
                 }
             }, SCAN_PERIOD);
             mBluetoothLeScanner.startScan(leScanCallback);
@@ -334,6 +341,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         mBluetoothLeService.disconnect();
         stopService(gattServiceIntent);
         connectedBleDeviceAddress = null;
+        bledevice = null;
 		mCharactToWrite = null;
     }
 
