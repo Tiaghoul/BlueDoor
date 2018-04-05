@@ -8,23 +8,24 @@
     android:layout_height="wrap_content">
 
         <TextView
-            android:id="@+id/ble_address"
-            tools:text="Device Address"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
-            android:maxLines="1"
-            android:textAllCaps="true"
-            android:textSize="12sp"/>
-
-        <TextView
             android:id="@+id/ble_name"
             tools:text="Device Name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="2"
-            android:textSize="16sp"/>
+            android:textSize="18sp"/>
+
+
+        <TextView
+            android:id="@+id/ble_address"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:textAllCaps="true"
+            android:textSize="12sp"
+            tools:text="Device Address" />
 
 </LinearLayout>
