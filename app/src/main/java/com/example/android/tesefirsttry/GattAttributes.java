@@ -14,6 +14,7 @@ public class GattAttributes {
 	public static final String BLE_OPEN_DOOR_CHARACT = "713d0002-503e-4c75-ba94-3148f18d941e";
 	public static final String BLE_READ_CHARACT = "713d0003-503e-4c75-ba94-3148f18d941e";
 	public static final String BLE_NOTIFY_CHARACT = "713d0004-503e-4c75-ba94-3148f18d941e";
+//	public static final String BLE_RESULT = "713d0005-503e-4c75-ba94-3148f18d941e";
 
     static {
         // Sample Services.
@@ -24,7 +25,7 @@ public class GattAttributes {
 		attributes.put(BLE_OPEN_DOOR_CHARACT, "BLE OPEN DOOR CHARACT");
 		attributes.put(BLE_READ_CHARACT, "BLE READ CHARACT");
 		attributes.put(BLE_NOTIFY_CHARACT, "BLE NOTIFICATION CHARACT");
-
+//		attributes.put(BLE_RESULT, "BLE RESULT CHARACT");
     }
 
     public static String lookup(String uuid, String defaultName) {

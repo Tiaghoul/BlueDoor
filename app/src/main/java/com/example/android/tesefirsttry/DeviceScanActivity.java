@@ -7,6 +7,7 @@ import android.Manifest;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
@@ -45,13 +46,13 @@ import java.util.UUID;
 
 
 public class DeviceScanActivity extends AppCompatActivity {
-    private final static String TAG = DeviceScanActivity.class.getSimpleName();
+//    private final static String TAG = DeviceScanActivity.class.getSimpleName();
+    private final static String TAG = "mytag";
 
     private final ArrayList<BluetoothDevice> bleDevicesList = new ArrayList<>();
     private Intent gattServiceIntent;
     private TextView emptyTextView;
 
-    private LocationManager mLocationManager;
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothLeScanner mBluetoothLeScanner;
     private Handler mHandler;
@@ -61,13 +62,16 @@ public class DeviceScanActivity extends AppCompatActivity {
     private BleService mBluetoothLeService;
 
     private BluetoothGattCharacteristic mCharactToWrite;
-    // Stops scanning after 10 seconds.
-    private static final long SCAN_PERIOD = 5000;
+//    private BluetoothGattCharacteristic mCharactToRead;
+
+    // Stops scanning after 4 seconds.
+    private static final long SCAN_PERIOD = 4000;
     private static final int REQUEST_ENABLE_BT = 1;
 
     private final static UUID UUID_BLE_AC_SERVICE = UUID.fromString(GattAttributes.BLE_AC_SERVICE);
-
     private final static UUID UUID_BLE_OPEN_DOOR_CHARACT = UUID.fromString(GattAttributes.BLE_OPEN_DOOR_CHARACT);
+    private final static UUID UUID_BLE_NOTIFY_CHARACT = UUID.fromString(GattAttributes.BLE_NOTIFY_CHARACT );
+    private final static UUID UUID_BLE_READ_CHARACT = UUID.fromString(GattAttributes.BLE_READ_CHARACT);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -110,7 +114,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                 bledevice = mLeDeviceListAdapter.getItem(position);
                 if(connectedBleDeviceAddress == null){
                     gattServiceIntent = new Intent(getApplicationContext(), BleService.class);
-                    Log.d(TAG, "CLICKED ON " + bledevice.getName() + " | " + bledevice.getBluetoothClass().getDeviceClass());
+                    Log.d(TAG, "CLICKED ON " + bledevice.getName());
                     getApplicationContext().bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
                 }
             }
@@ -181,7 +185,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         // User chose not to enable Bluetooth.
         if (requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_CANCELED) {
             emptyTextView.setText("Bluetooth needs to be enabled");
-//            finish();
         }
         else if(requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_OK){
             mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
@@ -194,7 +197,6 @@ public class DeviceScanActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if(requestCode == 1){
             if(grantResults[0] != PackageManager.PERMISSION_GRANTED){
-//                Toast.makeText(this, "Location permission needed for app to work.", Toast.LENGTH_LONG).show();
                 emptyTextView.setText("Location permission needed for app to work");
             }
         }
@@ -227,7 +229,6 @@ public class DeviceScanActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     mBluetoothLeScanner.stopScan(leScanCallback);
-                    Toast.makeText(getApplicationContext(), "Scan ended", Toast.LENGTH_SHORT).show();
                     if (bleDevicesList.isEmpty()) {
                         emptyTextView.setVisibility(View.VISIBLE);
                         emptyTextView.setText("No devices were found");
@@ -248,7 +249,6 @@ public class DeviceScanActivity extends AppCompatActivity {
                 Log.e(TAG, "Unable to initialize Bluetooth");
                 finish();
             }
-            Log.i(TAG, "ble address: " + bledevice.getAddress());
             Boolean connected = mBluetoothLeService.connect(bledevice.getAddress());
             if(connected){
                 connectedBleDeviceAddress = bledevice.getAddress();
@@ -281,10 +281,14 @@ public class DeviceScanActivity extends AppCompatActivity {
             else if(BleService.ACTION_DISCONNECT.equals(action)){
                 dealWithDisconnect();
             }
+            else if(BleService.ACTION_WRITE_SUCCESS.equals(action)){
+//                mBluetoothLeService.readCharacteristic(mCharactToRead);
+            }
             else if(BleService.ACTION_DATA_AVAILABLE.equals(action)){
                 String value = intent.getStringExtra(mBluetoothLeService.EXTRA_DATA);
-                Log.d(TAG, "Charact value: " + value);
+                Log.d(TAG, "Data received: " + value);
                 Log.d(TAG, "-------------------------------");
+                dealWithDisconnect();
             }
         }
     };
@@ -311,11 +315,15 @@ public class DeviceScanActivity extends AppCompatActivity {
 
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0){
                         Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
-//                        mBluetoothLeService.readCharacteristic(gattCharacteristic);
+//                        if(UUID_BLE_READ_CHARACT.equals(gattCharacteristic.getUuid())){
+//                            mCharactToRead = gattCharacteristic;
+//                        }
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0){
                         Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
-//                        mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
+                        if(UUID_BLE_NOTIFY_CHARACT.equals(gattCharacteristic.getUuid())){
+                            mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
+                        }
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_WRITE) > 0){
                         Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY WRITE");
@@ -332,7 +340,6 @@ public class DeviceScanActivity extends AppCompatActivity {
     private void openDoor(){
         if(mCharactToWrite != null){
             String string_to_send = "open";
-            Log.d(TAG, "STRING : " + string_to_send);
             mBluetoothLeService.writeCharacteristic(mCharactToWrite, string_to_send);
         }
     }
@@ -352,6 +359,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         intentFilter.addAction(BleService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BleService.ACTION_DATA_AVAILABLE);
         intentFilter.addAction(BleService.ACTION_DISCONNECT);
+        intentFilter.addAction(BleService.ACTION_WRITE_SUCCESS);
         return intentFilter;
     }
 }

@@ -26,17 +26,13 @@ import java.util.List;
  * given Bluetooth LE device.
  */
 public class BleService extends Service {
-    private final static String TAG = BleService.class.getSimpleName();
+//    private final static String TAG = BleService.class.getSimpleName();
+    private final static String TAG = "mytag";
 
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
-    private int mConnectionState = STATE_DISCONNECTED;
-
-    private static final int STATE_DISCONNECTED = 0;
-    private static final int STATE_CONNECTING = 1;
-    private static final int STATE_CONNECTED = 2;
 
     public final static String ACTION_GATT_CONNECTED =
             "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
@@ -50,32 +46,32 @@ public class BleService extends Service {
             "com.example.bluetooth.le.ACTION_DISCONNECT";
     public final static String EXTRA_DATA =
             "com.example.bluetooth.le.EXTRA_DATA";
+    public final static String ACTION_WRITE_SUCCESS =
+            "com.example.bluetooth.le.ACTION_WRITE_SUCCESS";
 
     private final static UUID CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID =
             UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
     private final static UUID UUID_BLE_OPEN_DOOR_CHARACT =
             UUID.fromString(GattAttributes.BLE_OPEN_DOOR_CHARACT);
-
+    private final static UUID UUID_BLE_READ_CHARACT =
+            UUID.fromString(GattAttributes.BLE_READ_CHARACT);
     private final static UUID UUID_BLE_NOTIFY_CHARACT =
             UUID.fromString(GattAttributes.BLE_NOTIFY_CHARACT);
 
-    // Implements callback methods for GATT events that the app cares about.  For example,
-    // connection change and services discovered.
+
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            Log.d(TAG, "ENTROU NO onConnectionStateChange");
+//            Log.d(TAG, "ENTROU NO onConnectionStateChange");
             String intentAction;
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 intentAction = ACTION_GATT_CONNECTED;
-                mConnectionState = STATE_CONNECTED;
                 // Attempts to discover services after successful connection.
                 Log.i(TAG, "Connected to GATT server. \nAttempting to start service discovery:" + mBluetoothGatt.discoverServices());
                 broadcastUpdate(intentAction);
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED;
-                mConnectionState = STATE_DISCONNECTED;
                 Log.i(TAG, "Disconnected from GATT server.");
                 broadcastUpdate(intentAction);
             }
@@ -111,11 +107,11 @@ public class BleService extends Service {
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             if(UUID_BLE_OPEN_DOOR_CHARACT.equals(characteristic.getUuid())){
                 if(status == BluetoothGatt.GATT_SUCCESS){
-                    Log.d(TAG, "-----------ENTROU NO onCharacteristicWrite COM sucesso " + characteristic.getUuid());
-                    broadcastUpdate(ACTION_DISCONNECT);
+                    Log.d(TAG, "escreveu com sucesso " + characteristic.getUuid());
+//                    broadcastUpdate(ACTION_DISCONNECT);
                 }
                 else {
-                    Log.d(TAG, "-----------ENTROU NO onCharacteristicWrite SEM sucesso " + characteristic.getUuid());
+                    Log.d(TAG, "escreveu sem sucesso " + characteristic.getUuid());
                     broadcastUpdate(ACTION_DISCONNECT);
                 }
             }
@@ -129,15 +125,15 @@ public class BleService extends Service {
 
     private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
-        Log.d(TAG, "ENTRA broadcastUpdate");
+//        Log.d(TAG, "ENTRA broadcastUpdate");
 
         if (UUID_BLE_NOTIFY_CHARACT.equals(characteristic.getUuid())) {
-            final byte[] data = characteristic.getValue();
-            Log.d(TAG, "Data received -> " + new String(data));
-//            intent.putExtra(EXTRA_DATA, String.valueOf(final_value));
+            String data_string = new String(characteristic.getValue());
+//            Log.d(TAG, "Data received -> " + data_string + " || size: " + data_string.length());
+            intent.putExtra(EXTRA_DATA, String.valueOf(data_string));
         } else {
             int final_value1 = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
-            Log.d(TAG, "Data received: " + final_value1);
+//            Log.d(TAG, "Data received: " + final_value1);
             intent.putExtra(EXTRA_DATA, String.valueOf(final_value1));
 
 //            final byte[] data = characteristic.getValue();
@@ -165,9 +161,6 @@ public class BleService extends Service {
 
     @Override
     public boolean onUnbind(Intent intent) {
-        // After using a given device, you should make sure that BluetoothGatt.close() is called
-        // such that resources are cleaned up properly.  In this particular example, close() is
-        // invoked when the UI is disconnected from the Service.
         mBluetoothGatt.close();
         close();
         return super.onUnbind(intent);
@@ -176,8 +169,6 @@ public class BleService extends Service {
     private final IBinder mBinder = new LocalBinder();
 
     public boolean initialize() {
-        // For API level 18 and above, get a reference to BluetoothAdapter through
-        // BluetoothManager.
         if (mBluetoothManager == null) {
             mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
             if (mBluetoothManager == null) {
@@ -207,7 +198,6 @@ public class BleService extends Service {
                 && mBluetoothGatt != null) {
             Log.d(TAG, "Trying to use an existing mBluetoothGatt for connection.");
             if (mBluetoothGatt.connect()) {
-                mConnectionState = STATE_CONNECTING;
                 return true;
             } else {
                 return false;
@@ -224,7 +214,6 @@ public class BleService extends Service {
         Log.d(TAG, "Device to connect: " + device + "\nTrying to create a new connection.\"");
         mBluetoothGatt = device.connectGatt(this, false, mGattCallback);
         mBluetoothDeviceAddress = address;
-        mConnectionState = STATE_CONNECTING;
         return true;
     }
 
@@ -256,7 +245,7 @@ public class BleService extends Service {
     }
 
     public void writeCharacteristic(BluetoothGattCharacteristic characteristic, int value){
-        Log.d(TAG, "ENTRA writeCharacteristic com INT");
+//        Log.d(TAG, "ENTRA writeCharacteristic com INT");
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
@@ -268,7 +257,7 @@ public class BleService extends Service {
     }
 
     public void writeCharacteristic(BluetoothGattCharacteristic characteristic, String value){
-        Log.d(TAG, "ENTRA writeCharacteristic com STRING");
+//        Log.d(TAG, "ENTRA writeCharacteristic com STRING.");
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
@@ -280,28 +269,32 @@ public class BleService extends Service {
         } catch (UnsupportedEncodingException e) {
             Log.e(TAG, "Failed to convert message string to byte array");
         }
-
         characteristic.setValue(messageBytes);
-        mBluetoothGatt.writeCharacteristic(characteristic);
-
+        boolean did_write = mBluetoothGatt.writeCharacteristic(characteristic);
+        while(!did_write){
+            Log.d(TAG, "trying to write...");
+            did_write = mBluetoothGatt.writeCharacteristic(characteristic);
+        }
     }
 
 
     public void setCharacteristicNotification(BluetoothGattCharacteristic characteristic,
                                               boolean enabled) {
-        Log.d(TAG, "ENTROU setCharacteristicNotification: " + characteristic.getUuid());
+//        Log.d(TAG, "ENTROU setCharacteristicNotification: " + characteristic.getUuid());
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
         }
 
         mBluetoothGatt.setCharacteristicNotification(characteristic, enabled);
-        final BluetoothGattDescriptor descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID);
+        final BluetoothGattDescriptor descriptor =
+                characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID);
 
         if(descriptor != null){
             descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
             boolean connected = mBluetoothGatt.writeDescriptor(descriptor);
             while(!connected){
+                Log.w(TAG, "waiting for descriptor...");
                 connected = mBluetoothGatt.writeDescriptor(descriptor);
             }
         }
