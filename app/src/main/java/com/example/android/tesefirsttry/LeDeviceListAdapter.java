@@ -16,7 +16,7 @@ import java.util.ArrayList;
  */
 
 @SuppressWarnings("DefaultFileTemplate")
-public class LeDeviceListAdapter extends ArrayAdapter<BluetoothDevice> {
+class LeDeviceListAdapter extends ArrayAdapter<BluetoothDevice> {
     public LeDeviceListAdapter(Activity context, ArrayList<BluetoothDevice> bleDevices){
         super(context, 0, bleDevices);
     }

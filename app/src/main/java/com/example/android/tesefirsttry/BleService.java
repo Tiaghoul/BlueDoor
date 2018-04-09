@@ -46,16 +46,12 @@ public class BleService extends Service {
             "com.example.bluetooth.le.ACTION_DISCONNECT";
     public final static String EXTRA_DATA =
             "com.example.bluetooth.le.EXTRA_DATA";
-    public final static String ACTION_WRITE_SUCCESS =
-            "com.example.bluetooth.le.ACTION_WRITE_SUCCESS";
 
     private final static UUID CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID =
             UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
     private final static UUID UUID_BLE_OPEN_DOOR_CHARACT =
             UUID.fromString(GattAttributes.BLE_OPEN_DOOR_CHARACT);
-    private final static UUID UUID_BLE_READ_CHARACT =
-            UUID.fromString(GattAttributes.BLE_READ_CHARACT);
     private final static UUID UUID_BLE_NOTIFY_CHARACT =
             UUID.fromString(GattAttributes.BLE_NOTIFY_CHARACT);
 
@@ -197,11 +193,7 @@ public class BleService extends Service {
         if (mBluetoothDeviceAddress != null && address.equals(mBluetoothDeviceAddress)
                 && mBluetoothGatt != null) {
             Log.d(TAG, "Trying to use an existing mBluetoothGatt for connection.");
-            if (mBluetoothGatt.connect()) {
-                return true;
-            } else {
-                return false;
-            }
+            return mBluetoothGatt.connect();
         }
 
         final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);

@@ -5,7 +5,7 @@ import java.util.HashMap;
 /**
  * This class includes a small subset of standard GATT attributes for demonstration purposes.
  */
-public class GattAttributes {
+class GattAttributes {
     private static final HashMap<String, String> attributes = new HashMap<>();
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
 
