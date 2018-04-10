@@ -20,6 +20,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -61,9 +62,11 @@ public class DeviceScanActivity extends AppCompatActivity {
     private BluetoothDevice bleDevice;
     private String connectedBleDeviceAddress;
     private BleService mBluetoothLeService;
-
     private BluetoothGattCharacteristic mCharactToWrite;
 //    private BluetoothGattCharacteristic mCharactToRead;
+
+    private SharedPreferences mPrefs;
+    private SharedPreferences.Editor prefsEditor;
 
     // Stops scanning after 4 seconds.
     private static final long SCAN_PERIOD = 6000;
@@ -91,15 +94,17 @@ public class DeviceScanActivity extends AppCompatActivity {
 //      Initializing Bluetooth services (manager, adapter, scanner)
         BluetoothManager mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = mBluetoothManager.getAdapter();
-
 //      Check if Bluetooth is enabled. If not, requests the user to enable it.
         if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
         }
-        else {
-            mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
-        }
+        else {mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();}
+
+        mPrefs = getPreferences(MODE_PRIVATE);
+        prefsEditor = mPrefs.edit();
+        prefsEditor.putString("D0:C4:FD:8E:D2:D9", "LED_1");
+        prefsEditor.apply();
 
 //      Getting the listview and setting its adapter
         emptyTextView = findViewById(R.id.emptyView);
@@ -213,10 +218,17 @@ public class DeviceScanActivity extends AppCompatActivity {
                 public void run() {
                     if(!bleDevicesList.contains(device.getDevice())) {
                         String device_name = device.getDevice().getName();
-                        if(device_name != null){
-                            Log.d(TAG, device_name);
-                            mLeDeviceListAdapter.add(device.getDevice());
-                            mLeDeviceListAdapter.notifyDataSetChanged();
+                        if(device_name == null){
+                            return;
+                        }
+                        String device_address = device.getDevice().getAddress();
+                        if(mPrefs.contains(device_address)){
+                            String check_name = mPrefs.getString(device_address, "");
+                            if(check_name.equals(device_name)){
+                                Log.d(TAG, "Added device: " + device_name);
+                                mLeDeviceListAdapter.add(device.getDevice());
+                                mLeDeviceListAdapter.notifyDataSetChanged();
+                            }
                         }
                     }
                 }
@@ -276,25 +288,27 @@ public class DeviceScanActivity extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
-            if(BleService.ACTION_GATT_CONNECTED.equals(action)){
-                Toast.makeText(getApplicationContext(), "CONNECTED", Toast.LENGTH_SHORT).show();
-            }
-            else if(BleService.ACTION_GATT_DISCONNECTED.equals(action)){
-                getApplicationContext().unbindService(mServiceConnection);
-                Toast.makeText(getApplicationContext(), "DISCONNECTED", Toast.LENGTH_SHORT).show();
-            }
-            else if(BleService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)){
-                dealWithServices(mBluetoothLeService.getSupportedGattServices());
-                openDoor();
-            }
-            else if(BleService.ACTION_DISCONNECT.equals(action)){
-                dealWithDisconnect();
-            }
-            else if(BleService.ACTION_DATA_AVAILABLE.equals(action)){
-                String value = intent.getStringExtra(BleService.EXTRA_DATA);
-                Log.d(TAG, "Data received: " + value);
-                Log.d(TAG, "-------------------------------");
-                dealWithDisconnect();
+            switch (action) {
+                case BleService.ACTION_GATT_CONNECTED:
+                    Toast.makeText(getApplicationContext(), "CONNECTED", Toast.LENGTH_SHORT).show();
+                    break;
+                case BleService.ACTION_GATT_DISCONNECTED:
+                    getApplicationContext().unbindService(mServiceConnection);
+                    Toast.makeText(getApplicationContext(), "DISCONNECTED", Toast.LENGTH_SHORT).show();
+                    break;
+                case BleService.ACTION_GATT_SERVICES_DISCOVERED:
+                    dealWithServices(mBluetoothLeService.getSupportedGattServices());
+                    openDoor();
+                    break;
+                case BleService.ACTION_DISCONNECT:
+                    dealWithDisconnect();
+                    break;
+                case BleService.ACTION_DATA_AVAILABLE:
+                    String value = intent.getStringExtra(BleService.EXTRA_DATA);
+                    Log.d(TAG, "Data received: " + value);
+                    Log.d(TAG, "-------------------------------");
+                    dealWithDisconnect();
+                    break;
             }
         }
     };
