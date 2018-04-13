@@ -59,12 +59,12 @@ public class BleService extends Service {
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-//            Log.d(TAG, "ENTROU NO onConnectionStateChange");
             String intentAction;
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 intentAction = ACTION_GATT_CONNECTED;
                 // Attempts to discover services after successful connection.
-                Log.i(TAG, "Connected to GATT server. \nAttempting to start service discovery:" + mBluetoothGatt.discoverServices());
+                Log.i(TAG, "Connected to GATT server.");
+                mBluetoothGatt.discoverServices();
                 broadcastUpdate(intentAction);
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED;
@@ -104,7 +104,6 @@ public class BleService extends Service {
             if(UUID_BLE_OPEN_DOOR_CHARACT.equals(characteristic.getUuid())){
                 if(status == BluetoothGatt.GATT_SUCCESS){
                     Log.d(TAG, "escreveu com sucesso " + characteristic.getUuid());
-//                    broadcastUpdate(ACTION_DISCONNECT);
                 }
                 else {
                     Log.d(TAG, "escreveu sem sucesso " + characteristic.getUuid());
@@ -121,7 +120,6 @@ public class BleService extends Service {
 
     private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
-//        Log.d(TAG, "ENTRA broadcastUpdate");
 
         if (UUID_BLE_NOTIFY_CHARACT.equals(characteristic.getUuid())) {
             String data_string = new String(characteristic.getValue());
@@ -237,7 +235,6 @@ public class BleService extends Service {
     }
 
     public void writeCharacteristic(BluetoothGattCharacteristic characteristic, int value){
-//        Log.d(TAG, "ENTRA writeCharacteristic com INT");
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
@@ -249,7 +246,6 @@ public class BleService extends Service {
     }
 
     public void writeCharacteristic(BluetoothGattCharacteristic characteristic, String value){
-//        Log.d(TAG, "ENTRA writeCharacteristic com STRING.");
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
@@ -272,7 +268,6 @@ public class BleService extends Service {
 
     public void setCharacteristicNotification(BluetoothGattCharacteristic characteristic,
                                               boolean enabled) {
-//        Log.d(TAG, "ENTROU setCharacteristicNotification: " + characteristic.getUuid());
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
