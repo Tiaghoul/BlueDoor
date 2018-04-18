@@ -304,11 +304,11 @@ public class DeviceScanActivity extends AppCompatActivity {
                 case BleService.ACTION_GATT_SERVICES_DISCOVERED:
                     dealWithServices(mBluetoothLeService.getSupportedGattServices());
                     if(isBonded){
-                        Log.d(TAG, "IS BONDED CRLH");
+                        Log.d(TAG, "IS BONDED");
                         openDoor();
                     }
                     else{
-                        Log.d(TAG, "NAO TA BONDED");
+                        Log.d(TAG, "NOT BONDED");
                         dealWithDisconnect();
                     }
                     break;
@@ -406,7 +406,6 @@ public class DeviceScanActivity extends AppCompatActivity {
                 Log.d(TAG, "new bond state: " + bond_state);
                 if(bond_state == BluetoothDevice.BOND_BONDED){
                     if(firstBond){
-                        Log.d(TAG, "first: " + bond_state);
                         isBonded = true;
                         firstBond = false;
                         mBluetoothLeService.discoverServices();

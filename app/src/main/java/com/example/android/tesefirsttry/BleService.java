@@ -255,7 +255,6 @@ public class BleService extends Service {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
         }
-        Log.d(TAG, "PARTE DA MENSAGEM: " + value);
         characteristic.setValue(value, BluetoothGattCharacteristic.FORMAT_UINT8, 0);
         mBluetoothGatt.writeCharacteristic(characteristic);
 
@@ -276,7 +275,6 @@ public class BleService extends Service {
         characteristic.setValue(messageBytes);
         boolean did_write = mBluetoothGatt.writeCharacteristic(characteristic);
         while(!did_write){
-//            Log.d(TAG, "trying to write...");
             did_write = mBluetoothGatt.writeCharacteristic(characteristic);
         }
     }
@@ -297,7 +295,6 @@ public class BleService extends Service {
             descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
             boolean connected = mBluetoothGatt.writeDescriptor(descriptor);
             while(!connected){
-//                Log.w(TAG, "waiting for descriptor...");
                 connected = mBluetoothGatt.writeDescriptor(descriptor);
             }
         }
