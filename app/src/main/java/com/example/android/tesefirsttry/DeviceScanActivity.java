@@ -49,6 +49,7 @@ public class DeviceScanActivity extends AppCompatActivity {
 //    private final static String TAG = DeviceScanActivity.class.getSimpleName();
     private final static String TAG = "mytag";
 
+    private static boolean isBonded = false;
     private final ArrayList<BluetoothDevice> bleDevicesList = new ArrayList<>();
     private Intent gattServiceIntent;
     private TextView emptyTextView;
@@ -61,7 +62,7 @@ public class DeviceScanActivity extends AppCompatActivity {
     private LeDeviceListAdapter mLeDeviceListAdapter;
     private BluetoothDevice bleDevice;
     private String connectedBleDeviceAddress;
-    private BleService mBluetoothLeService;
+    public static BleService mBluetoothLeService;
     private BluetoothGattCharacteristic mCharactToWrite;
 //    private BluetoothGattCharacteristic mCharactToRead;
 
@@ -289,8 +290,12 @@ public class DeviceScanActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
             switch (action) {
-                case BleService.ACTION_GATT_CONNECTED:
-                    Toast.makeText(getApplicationContext(), "CONNECTED", Toast.LENGTH_SHORT).show();
+                case BleService.ACTION_GATT_CONNECTED_BONDED:
+                    Toast.makeText(getApplicationContext(), "CONNECTED/BONDED", Toast.LENGTH_SHORT).show();
+                    mBluetoothLeService.discoverServices();
+                    break;
+                case BleService.ACTION_GATT_CONNECTED_NOTBONDED:
+                    Toast.makeText(getApplicationContext(), "CONNECTED, BONDING..", Toast.LENGTH_SHORT).show();
                     break;
                 case BleService.ACTION_GATT_DISCONNECTED:
                     getApplicationContext().unbindService(mServiceConnection);
@@ -298,7 +303,14 @@ public class DeviceScanActivity extends AppCompatActivity {
                     break;
                 case BleService.ACTION_GATT_SERVICES_DISCOVERED:
                     dealWithServices(mBluetoothLeService.getSupportedGattServices());
-                    openDoor();
+                    if(isBonded){
+                        Log.d(TAG, "IS BONDED CRLH");
+                        openDoor();
+                    }
+                    else{
+                        Log.d(TAG, "NAO TA BONDED");
+                        dealWithDisconnect();
+                    }
                     break;
                 case BleService.ACTION_DISCONNECT:
                     dealWithDisconnect();
@@ -367,15 +379,44 @@ public class DeviceScanActivity extends AppCompatActivity {
         connectedBleDeviceAddress = null;
         bleDevice = null;
 		mCharactToWrite = null;
+//		isBonded = false;
     }
 
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(BleService.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(BleService.ACTION_GATT_CONNECTED_BONDED);
+        intentFilter.addAction(BleService.ACTION_GATT_CONNECTED_NOTBONDED);
         intentFilter.addAction(BleService.ACTION_GATT_DISCONNECTED);
         intentFilter.addAction(BleService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BleService.ACTION_DATA_AVAILABLE);
         intentFilter.addAction(BleService.ACTION_DISCONNECT);
         return intentFilter;
+    }
+
+    public static class BondReceiver extends BroadcastReceiver{
+        private static boolean firstBond = true;
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if(intent.getAction().equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)){
+                int bond_state = mBluetoothLeService.getBondState();
+                if(bond_state == 0){
+                    firstBond = true;
+                    return;
+                }
+                Log.d(TAG, "new bond state: " + bond_state);
+                if(bond_state == BluetoothDevice.BOND_BONDED){
+                    if(firstBond){
+                        Log.d(TAG, "first: " + bond_state);
+                        isBonded = true;
+                        firstBond = false;
+                        mBluetoothLeService.discoverServices();
+                    }
+                }
+                else{
+                    firstBond = true;
+                    isBonded = false;
+                }
+            }
+        }
     }
 }

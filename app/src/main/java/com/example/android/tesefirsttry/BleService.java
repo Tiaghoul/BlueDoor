@@ -33,9 +33,11 @@ public class BleService extends Service {
     private BluetoothAdapter mBluetoothAdapter;
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
-
-    public final static String ACTION_GATT_CONNECTED =
-            "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
+	private BluetoothDevice device = null;
+    public final static String ACTION_GATT_CONNECTED_BONDED =
+            "com.example.bluetooth.le.ACTION_GATT_CONNECTED_BONDED";
+    public final static String ACTION_GATT_CONNECTED_NOTBONDED =
+            "com.example.bluetooth.le.ACTION_GATT_CONNECTED_NOTBONDED";
     public final static String ACTION_GATT_DISCONNECTED =
             "com.example.bluetooth.le.ACTION_GATT_DISCONNECTED";
     public final static String ACTION_GATT_SERVICES_DISCOVERED =
@@ -59,15 +61,28 @@ public class BleService extends Service {
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            String intentAction;
+            String intentAction = ACTION_DISCONNECT;
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                intentAction = ACTION_GATT_CONNECTED;
                 // Attempts to discover services after successful connection.
                 Log.i(TAG, "Connected to GATT server.");
-                mBluetoothGatt.discoverServices();
+                if(getBondState() ==  BluetoothDevice.BOND_BONDED){
+                    Log.d(TAG, "already bonded");
+                    intentAction = ACTION_GATT_CONNECTED_BONDED;
+                }
+                else {
+                    boolean bonded = device.createBond();
+                    if (bonded) {
+                        Log.i(TAG, "ENTROU NO CREATEBOND");
+                        intentAction = ACTION_GATT_CONNECTED_NOTBONDED;
+                    } else {
+                        Log.i(TAG, "NAO ENTROU NO CREATEBOND");
+                    }
+                }
+//                mBluetoothGatt.discoverServices();
                 broadcastUpdate(intentAction);
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED;
+//                device.getClass().getMethods()
                 Log.i(TAG, "Disconnected from GATT server.");
                 broadcastUpdate(intentAction);
             }
@@ -194,7 +209,7 @@ public class BleService extends Service {
             return mBluetoothGatt.connect();
         }
 
-        final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+        device = mBluetoothAdapter.getRemoteDevice(address);
         if (device == null) {
             Log.w(TAG, "Device not found.  Unable to connect.");
             return false;
@@ -213,6 +228,7 @@ public class BleService extends Service {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
         }
+        device = null;
         mBluetoothGatt.disconnect();
     }
 
@@ -260,7 +276,7 @@ public class BleService extends Service {
         characteristic.setValue(messageBytes);
         boolean did_write = mBluetoothGatt.writeCharacteristic(characteristic);
         while(!did_write){
-            Log.d(TAG, "trying to write...");
+//            Log.d(TAG, "trying to write...");
             did_write = mBluetoothGatt.writeCharacteristic(characteristic);
         }
     }
@@ -281,7 +297,7 @@ public class BleService extends Service {
             descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
             boolean connected = mBluetoothGatt.writeDescriptor(descriptor);
             while(!connected){
-                Log.w(TAG, "waiting for descriptor...");
+//                Log.w(TAG, "waiting for descriptor...");
                 connected = mBluetoothGatt.writeDescriptor(descriptor);
             }
         }
@@ -291,5 +307,16 @@ public class BleService extends Service {
     public List<BluetoothGattService> getSupportedGattServices() {
         if (mBluetoothGatt == null) return null;
         return mBluetoothGatt.getServices();
+    }
+
+    public int getBondState(){
+        if(device != null){
+            return device.getBondState();
+        }
+        return 0;
+	}
+
+	public void discoverServices(){
+        mBluetoothGatt.discoverServices();
     }
 }
