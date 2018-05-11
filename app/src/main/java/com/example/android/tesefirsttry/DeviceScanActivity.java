@@ -22,6 +22,7 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -40,15 +41,17 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 
 public class DeviceScanActivity extends AppCompatActivity {
 //    private final static String TAG = DeviceScanActivity.class.getSimpleName();
     private final static String TAG = "mytag";
-
+    private final static String secretMessage = "uXUi27eQpTCOaB8DfHgD";
     private static boolean isBonded = false;
     private final ArrayList<BluetoothDevice> bleDevicesList = new ArrayList<>();
     private Intent gattServiceIntent;
@@ -64,18 +67,26 @@ public class DeviceScanActivity extends AppCompatActivity {
     private String connectedBleDeviceAddress;
     public static BleService mBluetoothLeService;
     private BluetoothGattCharacteristic mCharactToWrite;
-//    private BluetoothGattCharacteristic mCharactToRead;
 
     private SharedPreferences mPrefs;
     private SharedPreferences.Editor prefsEditor;
 
     // Stops scanning after 4 seconds.
-    private static final long SCAN_PERIOD = 6000;
+    private static final long SCAN_PERIOD = 3000;
     private static final int REQUEST_ENABLE_BT = 1;
 
     private final static UUID UUID_BLE_AC_SERVICE = UUID.fromString(GattAttributes.BLE_AC_SERVICE);
     private final static UUID UUID_BLE_OPEN_DOOR_CHARACT = UUID.fromString(GattAttributes.BLE_OPEN_DOOR_CHARACT);
     private final static UUID UUID_BLE_NOTIFY_CHARACT = UUID.fromString(GattAttributes.BLE_NOTIFY_CHARACT );
+
+
+//    DH key generation values
+    static int prime = 2147483647;
+    private static BigInteger generator = BigInteger.valueOf(16807);
+    private static BigInteger key;
+    private static BigInteger a;
+    private static BigInteger A;
+    private static boolean receivedArduinoKey = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -125,7 +136,6 @@ public class DeviceScanActivity extends AppCompatActivity {
                 }
             }
         });
-
         boolean canScan = checkIfCanScan();
         if(canScan){
             scanLeDevice(true);
@@ -305,6 +315,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                     dealWithServices(mBluetoothLeService.getSupportedGattServices());
                     if(isBonded){
                         Log.d(TAG, "IS BONDED");
+                        generateDHkeyValues();
                         openDoor();
                     }
                     else{
@@ -317,9 +328,19 @@ public class DeviceScanActivity extends AppCompatActivity {
                     break;
                 case BleService.ACTION_DATA_AVAILABLE:
                     String value = intent.getStringExtra(BleService.EXTRA_DATA);
-                    Log.d(TAG, "Data received: " + value);
+                    Log.d(TAG, "Data received: ." + value.substring(0, value.length()-1));
+                    if(value.substring(0, value.length()-1).equals("fail")){
+                        dealWithDisconnect();
+                        return;
+                    }
+                    if(!receivedArduinoKey){
+                        receivedArduinoKey = true;
+                        getSharedKey(value.substring(0, value.length()-1));
+                    }
+                    else{
+                        dealWithDisconnect();
+                    }
                     Log.d(TAG, "-------------------------------");
-                    dealWithDisconnect();
                     break;
             }
         }
@@ -368,17 +389,22 @@ public class DeviceScanActivity extends AppCompatActivity {
 
     private void openDoor(){
         if(mCharactToWrite != null){
-            String string_to_send = "open";
+            String string_to_send = A.toString();
             mBluetoothLeService.writeCharacteristic(mCharactToWrite, string_to_send);
         }
     }
 
     private void dealWithDisconnect(){
+        Log.d(TAG, "dealing with disconnect......");
         mBluetoothLeService.disconnect();
         stopService(gattServiceIntent);
         connectedBleDeviceAddress = null;
         bleDevice = null;
 		mCharactToWrite = null;
+        receivedArduinoKey = false;
+        a = null;
+        A = null;
+        key = null;
 //		isBonded = false;
     }
 
@@ -417,5 +443,36 @@ public class DeviceScanActivity extends AppCompatActivity {
                 }
             }
         }
+    }
+
+    private static BigInteger randomInt(){
+        Random r = new Random();
+        int random = r.nextInt(prime) + 1;
+        return BigInteger.valueOf(random);
+    }
+
+    private static void generateDHkeyValues(){
+        a = randomInt();
+        A = generator.modPow(a, BigInteger.valueOf(prime));
+        Log.d(TAG, "value of a: " + a.toString());
+        Log.d(TAG, "value of A: "+ A.toString());
+    }
+
+    private void getSharedKey(String value){
+        Integer arduinoKey = Integer.valueOf(value);
+        Log.d(TAG, "arduino key: " + arduinoKey);
+        key = BigInteger.valueOf(arduinoKey).modPow(a, BigInteger.valueOf(prime));
+        Log.d(TAG, "shared key = " + key);
+        String key_string = String.valueOf(key);
+//        Log.d(TAG, "shared key string = " + key_string);
+        xorAndSend(key_string);
+    }
+
+    private void xorAndSend(String sharedSecret){
+        StringBuilder sb = new StringBuilder();
+        for(int i = 0; i < secretMessage.length(); i++)
+            sb.append((char)(secretMessage.charAt(i) ^ sharedSecret.charAt(i % sharedSecret.length())));
+        String xoredMessage = sb.toString();
+        mBluetoothLeService.writeCharacteristic(mCharactToWrite, xoredMessage);
     }
 }
