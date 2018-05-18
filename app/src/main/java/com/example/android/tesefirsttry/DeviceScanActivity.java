@@ -22,7 +22,6 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -30,6 +29,7 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Base64;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -72,7 +72,7 @@ public class DeviceScanActivity extends AppCompatActivity {
     private SharedPreferences.Editor prefsEditor;
 
     // Stops scanning after 4 seconds.
-    private static final long SCAN_PERIOD = 3000;
+    private static final long SCAN_PERIOD = 2000;
     private static final int REQUEST_ENABLE_BT = 1;
 
     private final static UUID UUID_BLE_AC_SERVICE = UUID.fromString(GattAttributes.BLE_AC_SERVICE);
@@ -87,6 +87,9 @@ public class DeviceScanActivity extends AppCompatActivity {
     private static BigInteger a;
     private static BigInteger A;
     private static boolean receivedArduinoKey = false;
+    private static String second_half = "";
+    private static boolean sent_first_half = false;
+    private static boolean sent_second_half = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -133,6 +136,9 @@ public class DeviceScanActivity extends AppCompatActivity {
                     gattServiceIntent = new Intent(getApplicationContext(), BleService.class);
                     Log.d(TAG, "CLICKED ON " + bleDevice.getName());
                     getApplicationContext().bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
+                }
+                else{
+                    Log.d(TAG, "Still disconnecting..");
                 }
             }
         });
@@ -310,13 +316,15 @@ public class DeviceScanActivity extends AppCompatActivity {
                 case BleService.ACTION_GATT_DISCONNECTED:
                     getApplicationContext().unbindService(mServiceConnection);
                     Toast.makeText(getApplicationContext(), "DISCONNECTED", Toast.LENGTH_SHORT).show();
+                    if(bleDevice != null){
+                        dealWithDisconnect();
+                    }
                     break;
                 case BleService.ACTION_GATT_SERVICES_DISCOVERED:
                     dealWithServices(mBluetoothLeService.getSupportedGattServices());
                     if(isBonded){
-                        Log.d(TAG, "IS BONDED");
                         generateDHkeyValues();
-                        openDoor();
+                        initialize_comunication();
                     }
                     else{
                         Log.d(TAG, "NOT BONDED");
@@ -324,12 +332,14 @@ public class DeviceScanActivity extends AppCompatActivity {
                     }
                     break;
                 case BleService.ACTION_DISCONNECT:
-                    dealWithDisconnect();
+                    if(bleDevice != null){
+                        dealWithDisconnect();
+                    }
                     break;
                 case BleService.ACTION_DATA_AVAILABLE:
                     String value = intent.getStringExtra(BleService.EXTRA_DATA);
                     Log.d(TAG, "Data received: ." + value.substring(0, value.length()-1));
-                    if(value.substring(0, value.length()-1).equals("fail")){
+                    if(value.substring(0, value.length()-1).contains("fail")){
                         dealWithDisconnect();
                         return;
                     }
@@ -337,8 +347,14 @@ public class DeviceScanActivity extends AppCompatActivity {
                         receivedArduinoKey = true;
                         getSharedKey(value.substring(0, value.length()-1));
                     }
+                    else if(sent_first_half && !sent_second_half){
+                        sent_second_half = true;
+                        mBluetoothLeService.writeCharacteristic(mCharactToWrite, second_half.substring(0, second_half.length()-1));
+                    }
                     else{
-                        dealWithDisconnect();
+                        if(bleDevice != null){
+                            dealWithDisconnect();
+                        }
                     }
                     Log.d(TAG, "-------------------------------");
                     break;
@@ -355,7 +371,7 @@ public class DeviceScanActivity extends AppCompatActivity {
             if(UUID_BLE_AC_SERVICE.equals(gattService.getUuid())){
                 String uuid = gattService.getUuid().toString();
                 String service_name = GattAttributes.lookup(uuid, unknownServiceString);
-                Log.d(TAG, "SERVICE NAME -> " + service_name + " || UUID -> " + uuid);
+//                Log.d(TAG, "SERVICE NAME -> " + service_name + " || UUID -> " + uuid);
 
                 List<BluetoothGattCharacteristic> gattCharacteristics =
                         gattService.getCharacteristics();
@@ -367,16 +383,16 @@ public class DeviceScanActivity extends AppCompatActivity {
                     final int charaProp = gattCharacteristic.getProperties();
 
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0){
-                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
+//                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0){
-                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
+//                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
                         if(UUID_BLE_NOTIFY_CHARACT.equals(gattCharacteristic.getUuid())){
                             mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
                         }
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_WRITE) > 0){
-                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY WRITE");
+//                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY WRITE");
                         if(UUID_BLE_OPEN_DOOR_CHARACT.equals(gattCharacteristic.getUuid())){
                             mCharactToWrite = gattCharacteristic;
                             mCharactToWrite.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
@@ -387,7 +403,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     }
 
-    private void openDoor(){
+    private void initialize_comunication(){
         if(mCharactToWrite != null){
             String string_to_send = A.toString();
             mBluetoothLeService.writeCharacteristic(mCharactToWrite, string_to_send);
@@ -405,6 +421,9 @@ public class DeviceScanActivity extends AppCompatActivity {
         a = null;
         A = null;
         key = null;
+        second_half = "";
+        sent_first_half = false;
+        sent_second_half = false;
 //		isBonded = false;
     }
 
@@ -464,7 +483,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         key = BigInteger.valueOf(arduinoKey).modPow(a, BigInteger.valueOf(prime));
         Log.d(TAG, "shared key = " + key);
         String key_string = String.valueOf(key);
-//        Log.d(TAG, "shared key string = " + key_string);
         xorAndSend(key_string);
     }
 
@@ -473,6 +491,14 @@ public class DeviceScanActivity extends AppCompatActivity {
         for(int i = 0; i < secretMessage.length(); i++)
             sb.append((char)(secretMessage.charAt(i) ^ sharedSecret.charAt(i % sharedSecret.length())));
         String xoredMessage = sb.toString();
-        mBluetoothLeService.writeCharacteristic(mCharactToWrite, xoredMessage);
+
+        byte[] data = xoredMessage.getBytes();
+        String base64 = Base64.encodeToString(data, Base64.DEFAULT);
+        String first_half = base64.substring(0, 20);
+        second_half = base64.substring(20);
+        Log.d(TAG, "sending encrypted message: " + xoredMessage);
+        Log.d(TAG, "ENCODED IN BASE 64: " + base64);
+        sent_first_half = true;
+        mBluetoothLeService.writeCharacteristic(mCharactToWrite, first_half);
     }
 }
