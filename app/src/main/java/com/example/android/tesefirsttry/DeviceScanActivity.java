@@ -42,10 +42,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.math.BigInteger;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+
+import de.frank_durr.ecdh_curve25519.ECDHCurve25519;
 
 
 public class DeviceScanActivity extends AppCompatActivity {
@@ -90,6 +94,18 @@ public class DeviceScanActivity extends AppCompatActivity {
     private static String second_half = "";
     private static boolean sent_first_half = false;
     private static boolean sent_second_half = false;
+
+    static {
+        // Load native library ECDH-Curve25519-Mobile implementing Diffie-Hellman key
+        // exchange with elliptic curve 25519.
+        try {
+            System.loadLibrary("ecdhcurve25519");
+            Log.i(TAG, "Loaded ecdhcurve25519 library.");
+        } catch (UnsatisfiedLinkError e) {
+            Log.e(TAG, "Error loading ecdhcurve25519 library: " + e.getMessage());
+        }
+    }
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
