@@ -42,12 +42,18 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import de.frank_durr.ecdh_curve25519.ECDHCurve25519;
 
@@ -84,16 +90,17 @@ public class DeviceScanActivity extends AppCompatActivity {
     private final static UUID UUID_BLE_NOTIFY_CHARACT = UUID.fromString(GattAttributes.BLE_NOTIFY_CHARACT );
 
 
-//    DH key generation values
-    static int prime = 2147483647;
-    private static BigInteger generator = BigInteger.valueOf(16807);
-    private static BigInteger key;
-    private static BigInteger a;
-    private static BigInteger A;
-    private static boolean receivedArduinoKey = false;
-    private static String second_half = "";
-    private static boolean sent_first_half = false;
-    private static boolean sent_second_half = false;
+//    ECDH key generation values
+    private static byte[] smartphone_secret_key;
+    private static byte[] smartphone_public_key;
+//    private static int[] unsigned_smartphone_pub_key;
+    private static byte[] arduino_public_key;
+    private static byte[] shared_secret_key;
+    private static int pub_key_n_parts;
+    private static String[] pub_key_parts;
+    private static int has_sent_n_parts = 0;
+    private static boolean send_all_parts = false;
+
 
     static {
         // Load native library ECDH-Curve25519-Mobile implementing Diffie-Hellman key
@@ -134,7 +141,7 @@ public class DeviceScanActivity extends AppCompatActivity {
 
         mPrefs = getPreferences(MODE_PRIVATE);
         prefsEditor = mPrefs.edit();
-        prefsEditor.putString("D0:C4:FD:8E:D2:D9", "LED_1");
+        prefsEditor.putString("D0:C4:FD:8E:D2:D9", "NANO 1");
         prefsEditor.apply();
 
 //      Getting the listview and setting its adapter
@@ -339,8 +346,8 @@ public class DeviceScanActivity extends AppCompatActivity {
                 case BleService.ACTION_GATT_SERVICES_DISCOVERED:
                     dealWithServices(mBluetoothLeService.getSupportedGattServices());
                     if(isBonded){
-                        generateDHkeyValues();
-                        initialize_comunication();
+                        generateECDHkeys();
+                        sendPubKey();
                     }
                     else{
                         Log.d(TAG, "NOT BONDED");
@@ -354,24 +361,18 @@ public class DeviceScanActivity extends AppCompatActivity {
                     break;
                 case BleService.ACTION_DATA_AVAILABLE:
                     String value = intent.getStringExtra(BleService.EXTRA_DATA);
-                    Log.d(TAG, "Data received: ." + value.substring(0, value.length()-1));
+                    Log.d(TAG, "Data received ->" + value.substring(0, value.length()-1));
                     if(value.substring(0, value.length()-1).contains("fail")){
                         dealWithDisconnect();
                         return;
                     }
-                    if(!receivedArduinoKey){
-                        receivedArduinoKey = true;
-                        getSharedKey(value.substring(0, value.length()-1));
-                    }
-                    else if(sent_first_half && !sent_second_half){
-                        sent_second_half = true;
-                        mBluetoothLeService.writeCharacteristic(mCharactToWrite, second_half.substring(0, second_half.length()-1));
-                    }
-                    else{
-                        if(bleDevice != null){
-                            dealWithDisconnect();
-                        }
-                    }
+                    if(!send_all_parts){
+                    	sendPubKey();
+					}
+					else{
+                        Log.d(TAG, "SENT ALL KEY PARTS-------------------> " + value);
+                        dealWithDisconnect();
+					}
                     Log.d(TAG, "-------------------------------");
                     break;
             }
@@ -385,30 +386,28 @@ public class DeviceScanActivity extends AppCompatActivity {
 
         for(BluetoothGattService gattService : supportedGattServices){
             if(UUID_BLE_AC_SERVICE.equals(gattService.getUuid())){
-                String uuid = gattService.getUuid().toString();
-                String service_name = GattAttributes.lookup(uuid, unknownServiceString);
+//                String uuid = gattService.getUuid().toString();
+//                String service_name = GattAttributes.lookup(uuid, unknownServiceString);
 //                Log.d(TAG, "SERVICE NAME -> " + service_name + " || UUID -> " + uuid);
 
                 List<BluetoothGattCharacteristic> gattCharacteristics =
                         gattService.getCharacteristics();
 
                 for(BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics){
-                    uuid = gattCharacteristic.getUuid().toString();
+                    String uuid = gattCharacteristic.getUuid().toString();
                     String charac_name = GattAttributes.lookup(uuid,unknownCharaString);
 
                     final int charaProp = gattCharacteristic.getProperties();
 
-                    if((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0){
+//                    if((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0){
 //                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
-                    }
+//                    }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0){
-//                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY NOTIFY");
                         if(UUID_BLE_NOTIFY_CHARACT.equals(gattCharacteristic.getUuid())){
                             mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
                         }
                     }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_WRITE) > 0){
-//                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY WRITE");
                         if(UUID_BLE_OPEN_DOOR_CHARACT.equals(gattCharacteristic.getUuid())){
                             mCharactToWrite = gattCharacteristic;
                             mCharactToWrite.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
@@ -419,12 +418,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     }
 
-    private void initialize_comunication(){
-        if(mCharactToWrite != null){
-            String string_to_send = A.toString();
-            mBluetoothLeService.writeCharacteristic(mCharactToWrite, string_to_send);
-        }
-    }
 
     private void dealWithDisconnect(){
         Log.d(TAG, "dealing with disconnect......");
@@ -433,13 +426,9 @@ public class DeviceScanActivity extends AppCompatActivity {
         connectedBleDeviceAddress = null;
         bleDevice = null;
 		mCharactToWrite = null;
-        receivedArduinoKey = false;
-        a = null;
-        A = null;
-        key = null;
-        second_half = "";
-        sent_first_half = false;
-        sent_second_half = false;
+        has_sent_n_parts = 0;
+        send_all_parts = false;
+        pub_key_n_parts = 0;
 //		isBonded = false;
     }
 
@@ -480,41 +469,99 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     }
 
-    private static BigInteger randomInt(){
-        Random r = new Random();
-        int random = r.nextInt(prime) + 1;
-        return BigInteger.valueOf(random);
+//    DH WITH ECC KEY GENERATION/SHARING FUNCTIONS
+
+    private static void generateECDHkeys(){
+        Log.d(TAG, "generating ECDH KEYS");
+        SecureRandom random = new SecureRandom();
+        smartphone_secret_key = ECDHCurve25519.generate_secret_key(random);
+        smartphone_public_key = ECDHCurve25519.generate_public_key(smartphone_secret_key);
+
+        String base64 = Base64.encodeToString(smartphone_public_key, Base64.DEFAULT);
+        Log.d(TAG, "SIGNED PUB KEY: " + Arrays.toString(smartphone_public_key));
+        Log.d(TAG, "ENCODED IN BASE 64: " + base64 +  " || " + base64.length());
+        if((base64.length()+1 ) % 20 == 0){
+            pub_key_n_parts = base64.length()/ 20;
+        }
+        else{
+            pub_key_n_parts = (base64.length() / 20) + 1;
+        }
+        base64 = String.valueOf(pub_key_n_parts) + base64;
+        pub_key_parts = new String[pub_key_n_parts];
+        for(int k = 0; k < pub_key_n_parts-1; k++){
+            String substring = base64.substring(20*k, 20*(k+1));
+            pub_key_parts[k] = substring;
+        }
+        String last_part = base64.substring(20*(pub_key_n_parts-1), base64.length());
+        if(last_part.endsWith("\n")){
+            pub_key_parts[pub_key_n_parts-1] = last_part.substring(0, last_part.length()-1);
+        }
+        else{
+            pub_key_parts[pub_key_n_parts-1] = last_part;
+        }
+        Log.d(TAG, "ARRAY WITH KEY PARTS: " + Arrays.toString(pub_key_parts));
+
     }
 
-    private static void generateDHkeyValues(){
-        a = randomInt();
-        A = generator.modPow(a, BigInteger.valueOf(prime));
-        Log.d(TAG, "value of a: " + a.toString());
-        Log.d(TAG, "value of A: "+ A.toString());
+    private void sendPubKey(){
+        Log.d(TAG, "SENDING PART "+ has_sent_n_parts + ": " + pub_key_parts[has_sent_n_parts]);
+        mBluetoothLeService.writeCharacteristic(mCharactToWrite, pub_key_parts[has_sent_n_parts]);
+        has_sent_n_parts++;
+        if(has_sent_n_parts == pub_key_n_parts){
+            Log.d(TAG, "SENT EVERYTHING!!");
+            send_all_parts = true;
+        }
     }
 
-    private void getSharedKey(String value){
-        Integer arduinoKey = Integer.valueOf(value);
-        Log.d(TAG, "arduino key: " + arduinoKey);
-        key = BigInteger.valueOf(arduinoKey).modPow(a, BigInteger.valueOf(prime));
-        Log.d(TAG, "shared key = " + key);
-        String key_string = String.valueOf(key);
-        xorAndSend(key_string);
+    private static void getArduinoPublicKey(String encoded_pub_key){
+        arduino_public_key = Base64.decode(encoded_pub_key.getBytes(), Base64.DEFAULT);
+        Log.d(TAG, "ARDUINO PUBLIC KEY: " +  Arrays.toString(arduino_public_key));
     }
 
-    private void xorAndSend(String sharedSecret){
-        StringBuilder sb = new StringBuilder();
-        for(int i = 0; i < secretMessage.length(); i++)
-            sb.append((char)(secretMessage.charAt(i) ^ sharedSecret.charAt(i % sharedSecret.length())));
-        String xoredMessage = sb.toString();
+    private static void generateSharedSecret(){
+        shared_secret_key = ECDHCurve25519.generate_shared_secret(smartphone_secret_key, arduino_public_key);
+        Log.d(TAG, "SHARED SECRET: " +  Arrays.toString(shared_secret_key));
+    }
 
-        byte[] data = xoredMessage.getBytes();
-        String base64 = Base64.encodeToString(data, Base64.DEFAULT);
-        String first_half = base64.substring(0, 20);
-        second_half = base64.substring(20);
-        Log.d(TAG, "sending encrypted message: " + xoredMessage);
-        Log.d(TAG, "ENCODED IN BASE 64: " + base64);
-        sent_first_half = true;
-        mBluetoothLeService.writeCharacteristic(mCharactToWrite, first_half);
+    private static void testingAESGCM(){
+        Log.d(TAG, "TESTING AES GCM..");
+        SecureRandom secureRandom = new SecureRandom();
+        shared_secret_key = new byte[]{-100, -98, 42, -119, 10, 107, -46, -20, -61, 17, 34, 73, 21, -90, 22, -71, 15, -83, 104, -61, 77, 77, -108, -106, 23, 53, -96, 66, -17, -28, 61, 37};
+
+        SecretKey secretKey = new SecretKeySpec(shared_secret_key, "AES");
+        byte[] iv = new byte[12];
+        secureRandom.nextBytes(iv);
+
+        final Cipher cipher;
+        try {
+            Log.d(TAG, "ENTRA NO TRY...");
+            cipher = Cipher.getInstance("AES/gcm/NoPadding");
+            GCMParameterSpec parameterSpec = new GCMParameterSpec(128, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
+            byte[] secretMessageBytes = secretMessage.getBytes();
+            byte[] cipherText = cipher.doFinal(secretMessageBytes);
+            String cipherString  =  new String(cipherText);
+            Log.d(TAG, "IV: " + Arrays.toString(iv));
+            Log.d(TAG, "CIPHER TEXT: " + Arrays.toString(cipherText));
+            Log.d(TAG, "CIPHER TEXT SIZE: " + cipherText.length);
+//            String finalText = Base64.encodeToString(cipherText, Base64.DEFAULT);
+//            Log.d(TAG, "ENCODED 64 TEXT: " + finalText);
+
+            ByteBuffer byteBuffer = ByteBuffer.allocate(iv.length + cipherText.length);
+//            byteBuffer.putInt(iv.length);
+            byteBuffer.put(iv);
+            byteBuffer.put(cipherText);
+            byte[] cipherMessage = byteBuffer.array();
+            Log.d(TAG, "CIPHER MESSAGE: " + Arrays.toString(cipherMessage));
+            Log.d(TAG, "CIPHER MESSAGE SIZE: " + cipherMessage.length);
+            String finalText = Base64.encodeToString(cipherMessage, Base64.DEFAULT);
+            Log.d(TAG, "ENCODED 64 MESSAGE: " + finalText);
+            Log.d(TAG, "ENCODED 64 MESSAGE SIZE: " + finalText.length());
+
+        } catch (Exception e) {
+            Log.d(TAG, "ENTRA NO CATCH...");
+            Log.d(TAG, "EXCEPTION: ", e);
+            e.printStackTrace();
+        }
     }
 }
