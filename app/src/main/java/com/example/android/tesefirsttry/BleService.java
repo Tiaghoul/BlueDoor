@@ -46,6 +46,8 @@ public class BleService extends Service {
             "com.example.bluetooth.le.ACTION_DATA_AVAILABLE";
     public final static String ACTION_DISCONNECT =
             "com.example.bluetooth.le.ACTION_DISCONNECT";
+    public final static String ACTION_WRITE_SUCCESS =
+            "com.example.bluetooth.le.ACTION_WRITE_SUCCESS";
     public final static String EXTRA_DATA =
             "com.example.bluetooth.le.EXTRA_DATA";
 
@@ -110,7 +112,7 @@ public class BleService extends Service {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
-            Log.d(TAG, "onCharacteristicChanged com " + characteristic.getUuid());
+            Log.d(TAG, "onCharacteristicChanged com -------> " + characteristic.getUuid());
             broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
         }
 
@@ -119,6 +121,7 @@ public class BleService extends Service {
             if(UUID_BLE_OPEN_DOOR_CHARACT.equals(characteristic.getUuid())){
                 if(status == BluetoothGatt.GATT_SUCCESS){
                     Log.d(TAG, "escreveu com sucesso " + characteristic.getUuid());
+                    broadcastUpdate(ACTION_WRITE_SUCCESS);
                 }
                 else {
                     Log.d(TAG, "escreveu sem sucesso " + characteristic.getUuid());
@@ -135,24 +138,13 @@ public class BleService extends Service {
 
     private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
-
         if (UUID_BLE_NOTIFY_CHARACT.equals(characteristic.getUuid())) {
             String data_string = new String(characteristic.getValue());
-//            Log.d(TAG, "Data received -> " + data_string + " || size: " + data_string.length());
             intent.putExtra(EXTRA_DATA, String.valueOf(data_string));
         } else {
             int final_value1 = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
 //            Log.d(TAG, "Data received: " + final_value1);
             intent.putExtra(EXTRA_DATA, String.valueOf(final_value1));
-
-//            final byte[] data = characteristic.getValue();
-//            Log.d(TAG, "Data received -> " + new String(data));
-//            if (data != null && data.length > 0) {
-//                final StringBuilder stringBuilder = new StringBuilder(data.length);
-//                for(byte byteChar : data)
-//                    stringBuilder.append(String.format("%02X ", byteChar));
-//                intent.putExtra(EXTRA_DATA, new String(data) + "\n" + stringBuilder.toString());
-//            }
         }
         sendBroadcast(intent);
     }
@@ -261,6 +253,7 @@ public class BleService extends Service {
     }
 
     public void writeCharacteristic(BluetoothGattCharacteristic characteristic, String value){
+        Log.d(TAG, "WRITING CHARACT: " + value + " length: " + value.length());
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;

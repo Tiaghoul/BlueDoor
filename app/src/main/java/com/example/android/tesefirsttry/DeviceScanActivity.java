@@ -41,13 +41,11 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 
 import javax.crypto.Cipher;
@@ -91,15 +89,23 @@ public class DeviceScanActivity extends AppCompatActivity {
 
 
 //    ECDH key generation values
+    private static byte[] shared_secret_key;
     private static byte[] smartphone_secret_key;
     private static byte[] smartphone_public_key;
-//    private static int[] unsigned_smartphone_pub_key;
-    private static byte[] arduino_public_key;
-    private static byte[] shared_secret_key;
     private static int pub_key_n_parts;
     private static String[] pub_key_parts;
-    private static int has_sent_n_parts = 0;
-    private static boolean send_all_parts = false;
+    private static int sent_n_pk_parts = 0;
+    private static boolean sent_all_pk_parts = false;
+
+    private static String encoded_arduino_pub_key = "";
+    private static int rec_n_arduino_key_parts = 0;
+    private static boolean received_arduino_pub_key = false;
+    private static byte[] arduino_public_key;
+
+    private static int ciphered_msg_n_parts = 0;
+    private static int sent_n_cm_parts = 0;
+    private static String[] ciphered_msg_parts;
+    private static boolean sent_all_cm_parts = false;
 
 
     static {
@@ -359,18 +365,48 @@ public class DeviceScanActivity extends AppCompatActivity {
                         dealWithDisconnect();
                     }
                     break;
+                case BleService.ACTION_WRITE_SUCCESS:
+                    if(!sent_all_pk_parts){
+                        sendPubKey();
+                    }
+					else if(!sent_all_cm_parts && received_arduino_pub_key){
+						sendCipheredMsg();
+					}
+//                    else if(sent_all_cm_parts){
+//                        Log.d(TAG, "NOTHING ELSE TO WRITE... ");
+//                        dealWithDisconnect();
+//                    }
+
+                    break;
                 case BleService.ACTION_DATA_AVAILABLE:
+                	Log.d(TAG, "GOT NEW DATA 4 YA");
                     String value = intent.getStringExtra(BleService.EXTRA_DATA);
                     Log.d(TAG, "Data received ->" + value.substring(0, value.length()-1));
                     if(value.substring(0, value.length()-1).contains("fail")){
                         dealWithDisconnect();
                         return;
                     }
-                    if(!send_all_parts){
-                    	sendPubKey();
+//                    if(!sent_all_pk_parts){
+//                    	sendPubKey();
+//					}
+					if(sent_all_pk_parts && !received_arduino_pub_key){
+                        encoded_arduino_pub_key += value;
+                        rec_n_arduino_key_parts += 1;
+                        if(rec_n_arduino_key_parts == 3){
+                            received_arduino_pub_key = true;
+                            Log.d(TAG, "ENCODED ARDUINO PUB KEY: " + encoded_arduino_pub_key);
+                            getArduinoPublicKey(encoded_arduino_pub_key);
+                            generateSharedSecret();
+//                            dealWithDisconnect();
+                            encryptAESGCM();
+							sendCipheredMsg();
+                        }
 					}
-					else{
-                        Log.d(TAG, "SENT ALL KEY PARTS-------------------> " + value);
+//					else if(!sent_all_cm_parts){
+//						sendCipheredMsg();
+//					}
+					else if(sent_all_cm_parts){
+                        Log.d(TAG, "NOTHING ELSE TO RECEIVE... ");
                         dealWithDisconnect();
 					}
                     Log.d(TAG, "-------------------------------");
@@ -426,9 +462,12 @@ public class DeviceScanActivity extends AppCompatActivity {
         connectedBleDeviceAddress = null;
         bleDevice = null;
 		mCharactToWrite = null;
-        has_sent_n_parts = 0;
-        send_all_parts = false;
+        sent_n_pk_parts = 0;
+        sent_all_pk_parts = false;
         pub_key_n_parts = 0;
+        received_arduino_pub_key = false;
+        encoded_arduino_pub_key = "";
+        ciphered_msg_n_parts = 0;
 //		isBonded = false;
     }
 
@@ -440,6 +479,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         intentFilter.addAction(BleService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BleService.ACTION_DATA_AVAILABLE);
         intentFilter.addAction(BleService.ACTION_DISCONNECT);
+        intentFilter.addAction(BleService.ACTION_WRITE_SUCCESS );
         return intentFilter;
     }
 
@@ -504,12 +544,12 @@ public class DeviceScanActivity extends AppCompatActivity {
     }
 
     private void sendPubKey(){
-        Log.d(TAG, "SENDING PART "+ has_sent_n_parts + ": " + pub_key_parts[has_sent_n_parts]);
-        mBluetoothLeService.writeCharacteristic(mCharactToWrite, pub_key_parts[has_sent_n_parts]);
-        has_sent_n_parts++;
-        if(has_sent_n_parts == pub_key_n_parts){
+        Log.d(TAG, "SENDING PART "+ sent_n_pk_parts + ": " + pub_key_parts[sent_n_pk_parts]);
+        mBluetoothLeService.writeCharacteristic(mCharactToWrite, pub_key_parts[sent_n_pk_parts]);
+        sent_n_pk_parts++;
+        if(sent_n_pk_parts == pub_key_n_parts){
             Log.d(TAG, "SENT EVERYTHING!!");
-            send_all_parts = true;
+            sent_all_pk_parts = true;
         }
     }
 
@@ -521,6 +561,58 @@ public class DeviceScanActivity extends AppCompatActivity {
     private static void generateSharedSecret(){
         shared_secret_key = ECDHCurve25519.generate_shared_secret(smartphone_secret_key, arduino_public_key);
         Log.d(TAG, "SHARED SECRET: " +  Arrays.toString(shared_secret_key));
+    }
+
+	private void sendCipheredMsg(){
+		Log.d(TAG, "SENDING CIPHERED PART "+ sent_n_cm_parts + ": " + ciphered_msg_parts[sent_n_cm_parts]);
+		mBluetoothLeService.writeCharacteristic(mCharactToWrite, ciphered_msg_parts[sent_n_cm_parts]);
+		sent_n_cm_parts++;
+		if(sent_n_cm_parts == ciphered_msg_n_parts){
+			Log.d(TAG, "SENT EVERYTHING CIPHERED!!");
+			sent_all_cm_parts = true;
+		}
+	}
+
+    private static void encryptAESGCM(){
+        SecureRandom secureRandom = new SecureRandom();
+        SecretKey secretKey = new SecretKeySpec(shared_secret_key, "AES");
+        byte[] initVector = new byte[12];
+        secureRandom.nextBytes(initVector);
+
+        try {
+            final Cipher cipher = Cipher.getInstance("AES/gcm/NoPadding");
+            GCMParameterSpec parameterSpec = new GCMParameterSpec(128, initVector);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
+            byte[] secretMessageBytes = secretMessage.getBytes();
+            byte[] cipheredMessage = cipher.doFinal(secretMessageBytes);
+            ByteBuffer byteBuffer = ByteBuffer.allocate(initVector.length + cipheredMessage.length);
+            byteBuffer.put(initVector);
+            byteBuffer.put(cipheredMessage);
+            byte[] cipheredBuffer = byteBuffer.array();
+            String encodedBuffer = Base64.encodeToString(cipheredBuffer, Base64.DEFAULT);
+            if((encodedBuffer.length()+1 ) % 20 == 0){
+                ciphered_msg_n_parts = encodedBuffer.length()/ 20;
+            }
+            else{
+                ciphered_msg_n_parts = (encodedBuffer.length() / 20) + 1;
+            }
+            encodedBuffer = String.valueOf(ciphered_msg_n_parts) + encodedBuffer;
+            ciphered_msg_parts = new String[ciphered_msg_n_parts];
+            for(int i = 0; i < ciphered_msg_n_parts-1; i++){
+                String substring = encodedBuffer.substring(20*i, 20*(i+1));
+                ciphered_msg_parts[i] = substring;
+            }
+            String last_part = encodedBuffer.substring(20*(ciphered_msg_n_parts-1), encodedBuffer.length());
+            if(last_part.endsWith("\n")){
+                ciphered_msg_parts[ciphered_msg_n_parts-1] = last_part.substring(0, last_part.length()-1);
+            }
+            else{
+                ciphered_msg_parts[ciphered_msg_n_parts-1] = last_part;
+            }
+            Log.d(TAG, "ARRAY WITH CIPHERED PARTS: " + Arrays.toString(ciphered_msg_parts));
+        } catch (Exception e){
+
+        }
     }
 
     private static void testingAESGCM(){
