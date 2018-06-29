@@ -87,7 +87,6 @@ public class DeviceScanActivity extends AppCompatActivity {
     private final static UUID UUID_BLE_OPEN_DOOR_CHARACT = UUID.fromString(GattAttributes.BLE_OPEN_DOOR_CHARACT);
     private final static UUID UUID_BLE_NOTIFY_CHARACT = UUID.fromString(GattAttributes.BLE_NOTIFY_CHARACT );
 
-
 //    ECDH key generation values
     private static byte[] shared_secret_key;
     private static byte[] smartphone_secret_key;
@@ -148,6 +147,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         mPrefs = getPreferences(MODE_PRIVATE);
         prefsEditor = mPrefs.edit();
         prefsEditor.putString("D0:C4:FD:8E:D2:D9", "NANO 1");
+        prefsEditor.putString("D7:D6:67:34:1C:59", "NANO 1");
         prefsEditor.apply();
 
 //      Getting the listview and setting its adapter
@@ -199,9 +199,8 @@ public class DeviceScanActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
-        if (mBluetoothLeService != null) {
-            final boolean result = mBluetoothLeService.connect(bleDevice.getAddress());
-            Log.d(TAG, "Connect request result=" + result);
+        if (mBluetoothLeService != null && bleDevice != null) {
+            mBluetoothLeService.connect(bleDevice.getAddress());
         }
     }
 
@@ -376,7 +375,6 @@ public class DeviceScanActivity extends AppCompatActivity {
 //                        Log.d(TAG, "NOTHING ELSE TO WRITE... ");
 //                        dealWithDisconnect();
 //                    }
-
                     break;
                 case BleService.ACTION_DATA_AVAILABLE:
                 	Log.d(TAG, "GOT NEW DATA 4 YA");
@@ -386,10 +384,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                         dealWithDisconnect();
                         return;
                     }
-//                    if(!sent_all_pk_parts){
-//                    	sendPubKey();
-//					}
-					if(sent_all_pk_parts && !received_arduino_pub_key){
+                	if(sent_all_pk_parts && !received_arduino_pub_key){
                         encoded_arduino_pub_key += value;
                         rec_n_arduino_key_parts += 1;
                         if(rec_n_arduino_key_parts == 3){
@@ -397,15 +392,11 @@ public class DeviceScanActivity extends AppCompatActivity {
                             Log.d(TAG, "ENCODED ARDUINO PUB KEY: " + encoded_arduino_pub_key);
                             getArduinoPublicKey(encoded_arduino_pub_key);
                             generateSharedSecret();
-//                            dealWithDisconnect();
                             encryptAESGCM();
 							sendCipheredMsg();
                         }
-					}
-//					else if(!sent_all_cm_parts){
-//						sendCipheredMsg();
-//					}
-					else if(sent_all_cm_parts){
+                    }
+                    else if(sent_all_cm_parts){
                         Log.d(TAG, "NOTHING ELSE TO RECEIVE... ");
                         dealWithDisconnect();
 					}
@@ -422,10 +413,6 @@ public class DeviceScanActivity extends AppCompatActivity {
 
         for(BluetoothGattService gattService : supportedGattServices){
             if(UUID_BLE_AC_SERVICE.equals(gattService.getUuid())){
-//                String uuid = gattService.getUuid().toString();
-//                String service_name = GattAttributes.lookup(uuid, unknownServiceString);
-//                Log.d(TAG, "SERVICE NAME -> " + service_name + " || UUID -> " + uuid);
-
                 List<BluetoothGattCharacteristic> gattCharacteristics =
                         gattService.getCharacteristics();
 
@@ -488,6 +475,9 @@ public class DeviceScanActivity extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
             if(intent.getAction().equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)){
+                if(mBluetoothLeService == null){
+                    return;
+                }
                 int bond_state = mBluetoothLeService.getBondState();
                 if(bond_state == 0){
                     firstBond = true;
@@ -563,15 +553,15 @@ public class DeviceScanActivity extends AppCompatActivity {
         Log.d(TAG, "SHARED SECRET: " +  Arrays.toString(shared_secret_key));
     }
 
-	private void sendCipheredMsg(){
-		Log.d(TAG, "SENDING CIPHERED PART "+ sent_n_cm_parts + ": " + ciphered_msg_parts[sent_n_cm_parts]);
-		mBluetoothLeService.writeCharacteristic(mCharactToWrite, ciphered_msg_parts[sent_n_cm_parts]);
-		sent_n_cm_parts++;
-		if(sent_n_cm_parts == ciphered_msg_n_parts){
-			Log.d(TAG, "SENT EVERYTHING CIPHERED!!");
-			sent_all_cm_parts = true;
-		}
-	}
+    private void sendCipheredMsg(){
+        Log.d(TAG, "SENDING CIPHERED PART "+ sent_n_cm_parts + ": " + ciphered_msg_parts[sent_n_cm_parts]);
+        mBluetoothLeService.writeCharacteristic(mCharactToWrite, ciphered_msg_parts[sent_n_cm_parts]);
+        sent_n_cm_parts++;
+        if(sent_n_cm_parts == ciphered_msg_n_parts){
+            Log.d(TAG, "SENT EVERYTHING CIPHERED!!");
+            sent_all_cm_parts = true;
+        }
+    }
 
     private static void encryptAESGCM(){
         SecureRandom secureRandom = new SecureRandom();
@@ -611,47 +601,6 @@ public class DeviceScanActivity extends AppCompatActivity {
             }
             Log.d(TAG, "ARRAY WITH CIPHERED PARTS: " + Arrays.toString(ciphered_msg_parts));
         } catch (Exception e){
-
-        }
-    }
-
-    private static void testingAESGCM(){
-        Log.d(TAG, "TESTING AES GCM..");
-        SecureRandom secureRandom = new SecureRandom();
-        shared_secret_key = new byte[]{-100, -98, 42, -119, 10, 107, -46, -20, -61, 17, 34, 73, 21, -90, 22, -71, 15, -83, 104, -61, 77, 77, -108, -106, 23, 53, -96, 66, -17, -28, 61, 37};
-
-        SecretKey secretKey = new SecretKeySpec(shared_secret_key, "AES");
-        byte[] iv = new byte[12];
-        secureRandom.nextBytes(iv);
-
-        final Cipher cipher;
-        try {
-            Log.d(TAG, "ENTRA NO TRY...");
-            cipher = Cipher.getInstance("AES/gcm/NoPadding");
-            GCMParameterSpec parameterSpec = new GCMParameterSpec(128, iv);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
-            byte[] secretMessageBytes = secretMessage.getBytes();
-            byte[] cipherText = cipher.doFinal(secretMessageBytes);
-            String cipherString  =  new String(cipherText);
-            Log.d(TAG, "IV: " + Arrays.toString(iv));
-            Log.d(TAG, "CIPHER TEXT: " + Arrays.toString(cipherText));
-            Log.d(TAG, "CIPHER TEXT SIZE: " + cipherText.length);
-//            String finalText = Base64.encodeToString(cipherText, Base64.DEFAULT);
-//            Log.d(TAG, "ENCODED 64 TEXT: " + finalText);
-
-            ByteBuffer byteBuffer = ByteBuffer.allocate(iv.length + cipherText.length);
-//            byteBuffer.putInt(iv.length);
-            byteBuffer.put(iv);
-            byteBuffer.put(cipherText);
-            byte[] cipherMessage = byteBuffer.array();
-            Log.d(TAG, "CIPHER MESSAGE: " + Arrays.toString(cipherMessage));
-            Log.d(TAG, "CIPHER MESSAGE SIZE: " + cipherMessage.length);
-            String finalText = Base64.encodeToString(cipherMessage, Base64.DEFAULT);
-            Log.d(TAG, "ENCODED 64 MESSAGE: " + finalText);
-            Log.d(TAG, "ENCODED 64 MESSAGE SIZE: " + finalText.length());
-
-        } catch (Exception e) {
-            Log.d(TAG, "ENTRA NO CATCH...");
             Log.d(TAG, "EXCEPTION: ", e);
             e.printStackTrace();
         }
