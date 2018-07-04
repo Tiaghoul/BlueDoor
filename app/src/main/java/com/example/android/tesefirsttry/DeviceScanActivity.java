@@ -162,6 +162,7 @@ public class DeviceScanActivity extends AppCompatActivity {
             public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
                 bleDevice = mLeDeviceListAdapter.getItem(position);
                 if(connectedBleDeviceAddress == null){
+                    bleListView.setClickable(false);
                     gattServiceIntent = new Intent(getApplicationContext(), BleService.class);
                     Log.d(TAG, "CLICKED ON " + bleDevice.getName());
                     getApplicationContext().bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
@@ -377,7 +378,6 @@ public class DeviceScanActivity extends AppCompatActivity {
 //                    }
                     break;
                 case BleService.ACTION_DATA_AVAILABLE:
-                	Log.d(TAG, "GOT NEW DATA 4 YA");
                     String value = intent.getStringExtra(BleService.EXTRA_DATA);
                     Log.d(TAG, "Data received ->" + value.substring(0, value.length()-1));
                     if(value.substring(0, value.length()-1).contains("fail")){
@@ -453,8 +453,10 @@ public class DeviceScanActivity extends AppCompatActivity {
         sent_all_pk_parts = false;
         pub_key_n_parts = 0;
         received_arduino_pub_key = false;
+        rec_n_arduino_key_parts = 0;
         encoded_arduino_pub_key = "";
         ciphered_msg_n_parts = 0;
+        bleListView.setClickable(true);
 //		isBonded = false;
     }
 
