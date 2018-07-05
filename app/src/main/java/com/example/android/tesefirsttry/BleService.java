@@ -21,10 +21,6 @@ import java.util.UUID;
 import java.util.List;
 
 
-/**
- * Service for managing connection and data communication with a GATT server hosted on a
- * given Bluetooth LE device.
- */
 public class BleService extends Service {
 //    private final static String TAG = BleService.class.getSimpleName();
     private final static String TAG = "mytag";
@@ -84,7 +80,6 @@ public class BleService extends Service {
                 broadcastUpdate(intentAction);
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED;
-//                device.getClass().getMethods()
                 Log.i(TAG, "Disconnected from GATT server.");
                 broadcastUpdate(intentAction);
             }

@@ -73,14 +73,13 @@ public class DeviceScanActivity extends AppCompatActivity {
     private LeDeviceListAdapter mLeDeviceListAdapter;
     private BluetoothDevice bleDevice;
     private String connectedBleDeviceAddress;
-    public static BleService mBluetoothLeService;
+    private static BleService mBluetoothLeService;
     private BluetoothGattCharacteristic mCharactToWrite;
 
     private SharedPreferences mPrefs;
-    private SharedPreferences.Editor prefsEditor;
 
-    // Stops scanning after 4 seconds.
-    private static final long SCAN_PERIOD = 2000;
+	// Stops scanning after 3 seconds.
+    private static final long SCAN_PERIOD = 3000;
     private static final int REQUEST_ENABLE_BT = 1;
 
     private final static UUID UUID_BLE_AC_SERVICE = UUID.fromString(GattAttributes.BLE_AC_SERVICE);
@@ -90,8 +89,7 @@ public class DeviceScanActivity extends AppCompatActivity {
 //    ECDH key generation values
     private static byte[] shared_secret_key;
     private static byte[] smartphone_secret_key;
-    private static byte[] smartphone_public_key;
-    private static int pub_key_n_parts;
+	private static int pub_key_n_parts;
     private static String[] pub_key_parts;
     private static int sent_n_pk_parts = 0;
     private static boolean sent_all_pk_parts = false;
@@ -145,7 +143,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         else {mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();}
 
         mPrefs = getPreferences(MODE_PRIVATE);
-        prefsEditor = mPrefs.edit();
+		SharedPreferences.Editor prefsEditor = mPrefs.edit();
         prefsEditor.putString("D0:C4:FD:8E:D2:D9", "NANO 1");
         prefsEditor.putString("D7:D6:67:34:1C:59", "NANO 1");
         prefsEditor.apply();
@@ -372,10 +370,6 @@ public class DeviceScanActivity extends AppCompatActivity {
 					else if(!sent_all_cm_parts && received_arduino_pub_key){
 						sendCipheredMsg();
 					}
-//                    else if(sent_all_cm_parts){
-//                        Log.d(TAG, "NOTHING ELSE TO WRITE... ");
-//                        dealWithDisconnect();
-//                    }
                     break;
                 case BleService.ACTION_DATA_AVAILABLE:
                     String value = intent.getStringExtra(BleService.EXTRA_DATA);
@@ -408,8 +402,6 @@ public class DeviceScanActivity extends AppCompatActivity {
 
     private void dealWithServices(List<BluetoothGattService> supportedGattServices) {
         if(supportedGattServices == null) { return;}
-        String unknownServiceString = getResources().getString(R.string.unknown_service);
-        String unknownCharaString = getResources().getString(R.string.unknown_characteristic);
 
         for(BluetoothGattService gattService : supportedGattServices){
             if(UUID_BLE_AC_SERVICE.equals(gattService.getUuid())){
@@ -417,14 +409,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                         gattService.getCharacteristics();
 
                 for(BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics){
-                    String uuid = gattCharacteristic.getUuid().toString();
-                    String charac_name = GattAttributes.lookup(uuid,unknownCharaString);
-
                     final int charaProp = gattCharacteristic.getProperties();
-
-//                    if((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0){
-//                        Log.d(TAG, ": Name -> " + charac_name + " || UUID: " + uuid + " HAS PROPERTY READ");
-//                    }
                     if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0){
                         if(UUID_BLE_NOTIFY_CHARACT.equals(gattCharacteristic.getUuid())){
                             mBluetoothLeService.setCharacteristicNotification(gattCharacteristic, true);
@@ -473,7 +458,7 @@ public class DeviceScanActivity extends AppCompatActivity {
     }
 
     public static class BondReceiver extends BroadcastReceiver{
-        private static boolean firstBond = true;
+//        private static boolean firstBond = true;
         @Override
         public void onReceive(Context context, Intent intent) {
             if(intent.getAction().equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)){
@@ -482,19 +467,19 @@ public class DeviceScanActivity extends AppCompatActivity {
                 }
                 int bond_state = mBluetoothLeService.getBondState();
                 if(bond_state == 0){
-                    firstBond = true;
+//                    firstBond = true;
                     return;
                 }
                 Log.d(TAG, "new bond state: " + bond_state);
                 if(bond_state == BluetoothDevice.BOND_BONDED){
-                    if(firstBond){
-                        isBonded = true;
-                        firstBond = false;
-                        mBluetoothLeService.discoverServices();
-                    }
-                }
+//                    if(firstBond){
+//                        firstBond = false;
+//					}
+					isBonded = true;
+					mBluetoothLeService.discoverServices();
+				}
                 else{
-                    firstBond = true;
+//                    firstBond = true;
                     isBonded = false;
                 }
             }
@@ -507,7 +492,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         Log.d(TAG, "generating ECDH KEYS");
         SecureRandom random = new SecureRandom();
         smartphone_secret_key = ECDHCurve25519.generate_secret_key(random);
-        smartphone_public_key = ECDHCurve25519.generate_public_key(smartphone_secret_key);
+		byte[] smartphone_public_key = ECDHCurve25519.generate_public_key(smartphone_secret_key);
 
         String base64 = Base64.encodeToString(smartphone_public_key, Base64.DEFAULT);
         Log.d(TAG, "SIGNED PUB KEY: " + Arrays.toString(smartphone_public_key));
