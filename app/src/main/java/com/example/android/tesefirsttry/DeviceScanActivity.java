@@ -441,6 +441,8 @@ public class DeviceScanActivity extends AppCompatActivity {
         rec_n_arduino_key_parts = 0;
         encoded_arduino_pub_key = "";
         ciphered_msg_n_parts = 0;
+        sent_n_cm_parts = 0;
+        sent_all_cm_parts = false;
         bleListView.setClickable(true);
 //		isBonded = false;
     }
@@ -458,7 +460,7 @@ public class DeviceScanActivity extends AppCompatActivity {
     }
 
     public static class BondReceiver extends BroadcastReceiver{
-//        private static boolean firstBond = true;
+        private static boolean firstBond = true;
         @Override
         public void onReceive(Context context, Intent intent) {
             if(intent.getAction().equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)){
@@ -467,19 +469,19 @@ public class DeviceScanActivity extends AppCompatActivity {
                 }
                 int bond_state = mBluetoothLeService.getBondState();
                 if(bond_state == 0){
-//                    firstBond = true;
+                    firstBond = true;
                     return;
                 }
                 Log.d(TAG, "new bond state: " + bond_state);
                 if(bond_state == BluetoothDevice.BOND_BONDED){
-//                    if(firstBond){
-//                        firstBond = false;
-//					}
-					isBonded = true;
-					mBluetoothLeService.discoverServices();
+                    if(firstBond){
+                        firstBond = false;
+					    isBonded = true;
+					    mBluetoothLeService.discoverServices();
+					}
 				}
                 else{
-//                    firstBond = true;
+                    firstBond = true;
                     isBonded = false;
                 }
             }
