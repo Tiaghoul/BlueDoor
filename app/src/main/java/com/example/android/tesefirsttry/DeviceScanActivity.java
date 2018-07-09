@@ -65,6 +65,7 @@ public class DeviceScanActivity extends AppCompatActivity {
     private Intent gattServiceIntent;
     private TextView emptyTextView;
     private ProgressBar progressBar;
+    private ProgressBar progBarAfterClick;
     private ListView bleListView;
 
     private BluetoothAdapter mBluetoothAdapter;
@@ -151,6 +152,7 @@ public class DeviceScanActivity extends AppCompatActivity {
 //      Getting the listview and setting its adapter
         emptyTextView = findViewById(R.id.emptyView);
         progressBar = findViewById(R.id.progressBar);
+        progBarAfterClick = findViewById(R.id.progBarAfterClick);
         bleListView = findViewById(R.id.list);
         mLeDeviceListAdapter = new LeDeviceListAdapter(this, bleDevicesList);
         bleListView.setAdapter(mLeDeviceListAdapter);
@@ -161,6 +163,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                 bleDevice = mLeDeviceListAdapter.getItem(position);
                 if(connectedBleDeviceAddress == null){
                     bleListView.setClickable(false);
+                    progBarAfterClick.setVisibility(View.VISIBLE);
                     gattServiceIntent = new Intent(getApplicationContext(), BleService.class);
                     Log.d(TAG, "CLICKED ON " + bleDevice.getName());
                     getApplicationContext().bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
@@ -426,7 +429,6 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     }
 
-
     private void dealWithDisconnect(){
         Log.d(TAG, "dealing with disconnect......");
         mBluetoothLeService.disconnect();
@@ -444,6 +446,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         sent_n_cm_parts = 0;
         sent_all_cm_parts = false;
         bleListView.setClickable(true);
+        progBarAfterClick.setVisibility(View.GONE);
 //		isBonded = false;
     }
 
