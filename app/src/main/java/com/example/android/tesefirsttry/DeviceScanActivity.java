@@ -175,7 +175,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         });
         boolean canScan = checkIfCanScan();
         if(canScan){
-            scanLeDevice(true);
+            scanLeDevice();
         }
     }
 
@@ -225,7 +225,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         if (item.getItemId() == R.id.re_scan_devices) {
             mLeDeviceListAdapter.clear();
             if(checkIfCanScan()){
-                scanLeDevice(true);
+                scanLeDevice();
             }
             return true;
         }
@@ -242,7 +242,7 @@ public class DeviceScanActivity extends AppCompatActivity {
             mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
             android.os.SystemClock.sleep(200);
             if(checkIfCanScan()){
-                scanLeDevice(true);
+                scanLeDevice();
             }
         }
     }
@@ -283,30 +283,26 @@ public class DeviceScanActivity extends AppCompatActivity {
         }
     };
 
-    private void scanLeDevice(final boolean enable) {
-        if (enable) {
-            // Stops scanning after a pre-defined scan period.
-            mHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    mBluetoothLeScanner.stopScan(leScanCallback);
-                    progressBar.setVisibility(View.GONE);
-                    if (bleDevicesList.isEmpty()) {
-                        emptyTextView.setVisibility(View.VISIBLE);
-                        emptyTextView.setText(R.string.no_devices_found);
-                    }
-                    else{
-                        bleListView.setVisibility(View.VISIBLE);
-                    }
-                }
-            }, SCAN_PERIOD);
-            bleListView.setVisibility(View.GONE);
-            emptyTextView.setVisibility(View.GONE);
-            progressBar.setVisibility(View.VISIBLE);
-            mBluetoothLeScanner.startScan(leScanCallback);
-        } else {
-            mBluetoothLeScanner.stopScan(leScanCallback);
-        }
+    private void scanLeDevice() {
+		mHandler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				mBluetoothLeScanner.stopScan(leScanCallback);
+				progressBar.setVisibility(View.GONE);
+				if (bleDevicesList.isEmpty()) {
+					emptyTextView.setVisibility(View.VISIBLE);
+					emptyTextView.setText(R.string.no_devices_found);
+				}
+				else{
+					bleListView.setVisibility(View.VISIBLE);
+				}
+			}
+		}, SCAN_PERIOD);
+		bleListView.setVisibility(View.GONE);
+		emptyTextView.setVisibility(View.GONE);
+		progressBar.setVisibility(View.VISIBLE);
+		mBluetoothLeScanner.startScan(leScanCallback);
+
     }
 
     private final ServiceConnection mServiceConnection = new ServiceConnection() {

@@ -100,7 +100,7 @@ public class BleService extends Service {
                                          int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.d(TAG, "onCharacteristicRead com " + characteristic.getUuid());
-                broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+                broadcastUpdate(characteristic);
             }
         }
 
@@ -108,7 +108,7 @@ public class BleService extends Service {
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
             Log.d(TAG, "onCharacteristicChanged com -------> " + characteristic.getUuid());
-            broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+            broadcastUpdate(characteristic);
         }
 
         @Override
@@ -131,8 +131,8 @@ public class BleService extends Service {
         sendBroadcast(intent);
     }
 
-    private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
-        final Intent intent = new Intent(action);
+    private void broadcastUpdate(final BluetoothGattCharacteristic characteristic) {
+        final Intent intent = new Intent(BleService.ACTION_DATA_AVAILABLE);
         if (UUID_BLE_NOTIFY_CHARACT.equals(characteristic.getUuid())) {
             String data_string = new String(characteristic.getValue());
             intent.putExtra(EXTRA_DATA, String.valueOf(data_string));
@@ -229,23 +229,23 @@ public class BleService extends Service {
     }
 
 
-    public void readCharacteristic(BluetoothGattCharacteristic characteristic) {
-        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized");
-            return;
-        }
-        mBluetoothGatt.readCharacteristic(characteristic);
-    }
+//    public void readCharacteristic(BluetoothGattCharacteristic characteristic) {
+//        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
+//            Log.w(TAG, "BluetoothAdapter not initialized");
+//            return;
+//        }
+//        mBluetoothGatt.readCharacteristic(characteristic);
+//    }
 
-    public void writeCharacteristic(BluetoothGattCharacteristic characteristic, int value){
-        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized");
-            return;
-        }
-        characteristic.setValue(value, BluetoothGattCharacteristic.FORMAT_UINT8, 0);
-        mBluetoothGatt.writeCharacteristic(characteristic);
-
-    }
+//    public void writeCharacteristic(BluetoothGattCharacteristic characteristic, int value){
+//        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
+//            Log.w(TAG, "BluetoothAdapter not initialized");
+//            return;
+//        }
+//        characteristic.setValue(value, BluetoothGattCharacteristic.FORMAT_UINT8, 0);
+//        mBluetoothGatt.writeCharacteristic(characteristic);
+//
+//    }
 
     public void writeCharacteristic(BluetoothGattCharacteristic characteristic, String value){
         Log.d(TAG, "WRITING CHARACT: " + value + " length: " + value.length());
