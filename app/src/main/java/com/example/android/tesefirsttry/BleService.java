@@ -76,7 +76,6 @@ public class BleService extends Service {
                         Log.i(TAG, "NAO ENTROU NO CREATEBOND");
                     }
                 }
-//                mBluetoothGatt.discoverServices();
                 broadcastUpdate(intentAction);
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED;
@@ -185,7 +184,7 @@ public class BleService extends Service {
 
     public boolean connect(final String address) {
         if (mBluetoothAdapter == null || address == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized or unspecified address.");
+            Log.d(TAG, "BluetoothAdapter not initialized or unspecified address.");
             return false;
         }
 
@@ -198,7 +197,7 @@ public class BleService extends Service {
 
         device = mBluetoothAdapter.getRemoteDevice(address);
         if (device == null) {
-            Log.w(TAG, "Device not found.  Unable to connect.");
+            Log.d(TAG, "Device not found.  Unable to connect.");
             return false;
         }
         // We want to directly connect to the device, so we are setting the autoConnect
@@ -215,8 +214,9 @@ public class BleService extends Service {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
         }
-        device = null;
         mBluetoothGatt.disconnect();
+        mBluetoothGatt.close();
+        device = null;
     }
 
 
@@ -285,6 +285,9 @@ public class BleService extends Service {
             while(!connected){
                 connected = mBluetoothGatt.writeDescriptor(descriptor);
             }
+        }
+        else{
+            Log.d(TAG, "Descriptor is null.");
         }
     }
 

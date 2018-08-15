@@ -310,7 +310,7 @@ public class DeviceScanActivity extends AppCompatActivity {
         public void onServiceConnected(ComponentName componentName, IBinder service) {
             mBluetoothLeService = ((BleService.LocalBinder) service).getService();
             if (!mBluetoothLeService.initialize()) {
-                Log.e(TAG, "Unable to initialize Bluetooth");
+                Log.d(TAG, "Unable to initialize Bluetooth");
                 finish();
             }
             Boolean connected = mBluetoothLeService.connect(bleDevice.getAddress());
@@ -333,15 +333,12 @@ public class DeviceScanActivity extends AppCompatActivity {
             final String action = intent.getAction();
             switch (action) {
                 case BleService.ACTION_GATT_CONNECTED_BONDED:
-                    Toast.makeText(getApplicationContext(), "CONNECTED/BONDED", Toast.LENGTH_SHORT).show();
                     mBluetoothLeService.discoverServices();
                     break;
                 case BleService.ACTION_GATT_CONNECTED_NOTBONDED:
-                    Toast.makeText(getApplicationContext(), "CONNECTED, BONDING..", Toast.LENGTH_SHORT).show();
                     break;
                 case BleService.ACTION_GATT_DISCONNECTED:
                     getApplicationContext().unbindService(mServiceConnection);
-                    Toast.makeText(getApplicationContext(), "DISCONNECTED", Toast.LENGTH_SHORT).show();
                     if(bleDevice != null){
                         dealWithDisconnect();
                     }
@@ -374,6 +371,7 @@ public class DeviceScanActivity extends AppCompatActivity {
                     String value = intent.getStringExtra(BleService.EXTRA_DATA);
                     Log.d(TAG, "Data received ->" + value.substring(0, value.length()-1));
                     if(value.substring(0, value.length()-1).contains("fail")){
+                        Toast.makeText(getApplicationContext(), "Something wrong happened, please try again.", Toast.LENGTH_SHORT).show();
                         dealWithDisconnect();
                         return;
                     }
